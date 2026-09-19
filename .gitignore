@@ -1,0 +1,24 @@
+# 本地密钥与配置，绝不提交
+backend/config.local.yml
+*.local.yml
+frontend/.env
+frontend/.env.*
+
+# 构建产物
+backend/target/
+frontend/dist/
+frontend/node_modules/
+
+# 可重新生成的验收产物
+.impeccable/review/
+.impeccable/config.local.json
+
+# 外部自动化留下的中间产物
+.github/modernize/
+
+# 编辑器与系统文件
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
