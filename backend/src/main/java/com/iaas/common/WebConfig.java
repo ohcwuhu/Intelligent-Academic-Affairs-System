@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import lombok.RequiredArgsConstructor;
 
 /**
  * Web 配置：鉴权拦截器与开发期跨域。
@@ -12,13 +13,10 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * 在业务入口抛 401，这样不必为每个接口单独维护白名单。
  */
 @Configuration
+@RequiredArgsConstructor
 public class WebConfig implements WebMvcConfigurer {
 
     private final AuthInterceptor authInterceptor;
-
-    public WebConfig(AuthInterceptor authInterceptor) {
-        this.authInterceptor = authInterceptor;
-    }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {

@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -26,19 +27,12 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/governance")
+@RequiredArgsConstructor
 public class GovernanceController {
 
     private final KnowledgeGapService gapService;
     private final FeedbackService feedbackService;
     private final AuditLogMapper auditMapper;
-
-    public GovernanceController(KnowledgeGapService gapService,
-                                FeedbackService feedbackService,
-                                AuditLogMapper auditMapper) {
-        this.gapService = gapService;
-        this.feedbackService = feedbackService;
-        this.auditMapper = auditMapper;
-    }
 
     @GetMapping("/overview")
     public R<GovernanceDtos.Overview> overview() {

@@ -16,16 +16,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/teacher")
+@RequiredArgsConstructor
 public class TeacherController {
 
     private final TeacherMapper teacherMapper;
-
-    public TeacherController(TeacherMapper teacherMapper) {
-        this.teacherMapper = teacherMapper;
-    }
 
     @GetMapping
     public R<PageResult<Teacher>> page(@RequestParam(defaultValue = "1") long page,

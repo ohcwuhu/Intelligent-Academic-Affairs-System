@@ -16,17 +16,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/course")
+@RequiredArgsConstructor
 public class CourseController {
 
     private final CourseMapper courseMapper;
-
-    public CourseController(CourseMapper courseMapper) {
-        this.courseMapper = courseMapper;
-    }
-
     /** 课程库分页查询。全体登录用户可读，便于学生查课程信息。 */
     @GetMapping
     public R<PageResult<Course>> page(@RequestParam(defaultValue = "1") long page,

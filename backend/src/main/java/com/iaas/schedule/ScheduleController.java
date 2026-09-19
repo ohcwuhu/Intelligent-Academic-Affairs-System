@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,17 +24,11 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/schedule")
+@RequiredArgsConstructor
 public class ScheduleController {
 
     private final EnrollmentService enrollmentService;
     private final TeachingClassService teachingClassService;
-
-    public ScheduleController(EnrollmentService enrollmentService,
-                              TeachingClassService teachingClassService) {
-        this.enrollmentService = enrollmentService;
-        this.teachingClassService = teachingClassService;
-    }
-
     /** 我的课表。termId 为空时取当前学期。 */
     @GetMapping("/my")
     public R<ScheduleDtos.Timetable> my(@RequestParam(required = false) Long termId) {

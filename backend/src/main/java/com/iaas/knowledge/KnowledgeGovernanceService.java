@@ -4,10 +4,10 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.iaas.common.BizException;
 import com.iaas.common.UserContext;
 import com.iaas.governance.AuditService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -24,9 +24,9 @@ import java.util.regex.Pattern;
  * 宁可让入口难走一点，也不要让不合格的文档偷偷生效。
  */
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class KnowledgeGovernanceService {
-
-    private static final Logger log = LoggerFactory.getLogger(KnowledgeGovernanceService.class);
 
     /** 切片长度上限。超过说明切分策略失效。 */
     private static final int MAX_CHUNK = 600;
@@ -39,15 +39,6 @@ public class KnowledgeGovernanceService {
     private final KnowledgeDocumentMapper documentMapper;
     private final KnowledgeChunkMapper chunkMapper;
     private final AuditService auditService;
-
-    public KnowledgeGovernanceService(KnowledgeDocumentMapper documentMapper,
-                                      KnowledgeChunkMapper chunkMapper,
-                                      AuditService auditService) {
-        this.documentMapper = documentMapper;
-        this.chunkMapper = chunkMapper;
-        this.auditService = auditService;
-    }
-
     public record ChunkIssue(Long chunkId, String hierarchyPath, String issue) {
     }
 

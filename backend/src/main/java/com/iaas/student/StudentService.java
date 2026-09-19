@@ -17,6 +17,7 @@ import com.iaas.system.mapper.CollegeMapper;
 import com.iaas.system.mapper.MajorMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.RequiredArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,6 +28,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class StudentService {
 
     private final StudentMapper studentMapper;
@@ -34,17 +36,6 @@ public class StudentService {
     private final MajorMapper majorMapper;
     private final ClazzMapper clazzMapper;
     private final EnrollmentMapper enrollmentMapper;
-
-    public StudentService(StudentMapper studentMapper, CollegeMapper collegeMapper,
-                          MajorMapper majorMapper, ClazzMapper clazzMapper,
-                          EnrollmentMapper enrollmentMapper) {
-        this.studentMapper = studentMapper;
-        this.collegeMapper = collegeMapper;
-        this.majorMapper = majorMapper;
-        this.clazzMapper = clazzMapper;
-        this.enrollmentMapper = enrollmentMapper;
-    }
-
     /** 分页查询。keyword 匹配学号或姓名。 */
     public PageResult<StudentDtos.StudentVO> page(long pageNo, long pageSize, String keyword,
                                                   Long majorId, Long clazzId,

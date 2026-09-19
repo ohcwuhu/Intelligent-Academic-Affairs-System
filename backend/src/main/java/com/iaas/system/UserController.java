@@ -18,20 +18,18 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 
 /** 账号管理（仅系统管理员）。 */
 @RestController
 @RequestMapping("/api/user")
+@RequiredArgsConstructor
 public class UserController {
 
     private final UserMapper userMapper;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
-
-    public UserController(UserMapper userMapper) {
-        this.userMapper = userMapper;
-    }
 
     @GetMapping
     public R<PageResult<User>> page(@RequestParam(defaultValue = "1") long page,

@@ -13,22 +13,17 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/teaching-class")
+@RequiredArgsConstructor
 public class TeachingClassController {
 
     private final TeachingClassService teachingClassService;
     private final EnrollmentService enrollmentService;
-
-    public TeachingClassController(TeachingClassService teachingClassService,
-                                   EnrollmentService enrollmentService) {
-        this.teachingClassService = teachingClassService;
-        this.enrollmentService = enrollmentService;
-    }
-
     /** 教学班列表。教务与管理员可查全部；教师只能查自己的。 */
     @GetMapping
     public R<List<TeachingClassDtos.TeachingClassVO>> list(

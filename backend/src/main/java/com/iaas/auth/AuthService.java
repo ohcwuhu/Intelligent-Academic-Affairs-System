@@ -8,21 +8,17 @@ import com.iaas.system.entity.User;
 import com.iaas.system.mapper.UserMapper;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
 
 import java.time.LocalDateTime;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
     private final UserMapper userMapper;
     private final JwtUtil jwtUtil;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
-
-    public AuthService(UserMapper userMapper, JwtUtil jwtUtil) {
-        this.userMapper = userMapper;
-        this.jwtUtil = jwtUtil;
-    }
-
     public AuthDtos.LoginResponse login(AuthDtos.LoginRequest req) {
         User user = userMapper.selectOne(
                 Wrappers.<User>lambdaQuery().eq(User::getUsername, req.username()));

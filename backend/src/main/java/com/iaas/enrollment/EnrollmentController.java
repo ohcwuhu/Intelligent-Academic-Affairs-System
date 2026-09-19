@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 
@@ -23,15 +24,11 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/enrollment")
+@RequiredArgsConstructor
 public class EnrollmentController {
 
     private final EnrollmentService enrollmentService;
     private final StudentMapper studentMapper;
-
-    public EnrollmentController(EnrollmentService enrollmentService, StudentMapper studentMapper) {
-        this.enrollmentService = enrollmentService;
-        this.studentMapper = studentMapper;
-    }
 
     @GetMapping("/my")
     public R<List<EnrollmentDtos.MyCourse>> my(@RequestParam(required = false) Long termId,

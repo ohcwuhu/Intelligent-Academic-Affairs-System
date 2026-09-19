@@ -7,9 +7,9 @@ import com.iaas.governance.AuditService;
 import com.iaas.governance.ConversationService;
 import com.iaas.governance.KnowledgeGapService;
 import com.iaas.knowledge.RetrievalService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -32,9 +32,9 @@ import java.util.regex.Pattern;
  * </ol>
  */
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class AssistantService {
-
-    private static final Logger log = LoggerFactory.getLogger(AssistantService.class);
 
     private static final int TOP_K = 5;
 
@@ -78,27 +78,6 @@ public class AssistantService {
     private final AuditService auditService;
     private final KnowledgeGapService gapService;
     private final ConversationService conversationService;
-
-    public AssistantService(IntentRouter intentRouter,
-                            RetrievalService retrievalService,
-                            LlmClient llmClient,
-                            NumberGroundingChecker groundingChecker,
-                            InjectionGuard injectionGuard,
-                            EnrollmentService enrollmentService,
-                            AuditService auditService,
-                            KnowledgeGapService gapService,
-                            ConversationService conversationService) {
-        this.intentRouter = intentRouter;
-        this.retrievalService = retrievalService;
-        this.llmClient = llmClient;
-        this.groundingChecker = groundingChecker;
-        this.injectionGuard = injectionGuard;
-        this.enrollmentService = enrollmentService;
-        this.auditService = auditService;
-        this.gapService = gapService;
-        this.conversationService = conversationService;
-    }
-
     public AssistantDtos.Answer ask(String question, Long conversationId) {
         long t0 = System.currentTimeMillis();
         UserContext.Principal me = UserContext.require();

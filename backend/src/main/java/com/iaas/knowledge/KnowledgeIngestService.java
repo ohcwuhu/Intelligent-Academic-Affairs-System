@@ -1,11 +1,11 @@
 package com.iaas.knowledge;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -25,9 +25,9 @@ import java.util.regex.Pattern;
  * 网上示例语料的区别：示例语料格式干净，真实文档要靠规则去认。
  */
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class KnowledgeIngestService {
-
-    private static final Logger log = LoggerFactory.getLogger(KnowledgeIngestService.class);
 
     /** 一条超过这个长度就按「（一）（二）」拆片，避免长条款稀释检索相关度。 */
     private static final int MAX_CHUNK_CHARS = 420;
@@ -46,13 +46,6 @@ public class KnowledgeIngestService {
 
     @Value("${iaas.knowledge.source-path:}")
     private String sourcePath;
-
-    public KnowledgeIngestService(KnowledgeDocumentMapper documentMapper,
-                                  KnowledgeChunkMapper chunkMapper) {
-        this.documentMapper = documentMapper;
-        this.chunkMapper = chunkMapper;
-    }
-
     public boolean isEmpty() {
         return documentMapper.selectCount(
                 Wrappers.<KnowledgeDocument>lambdaQuery().eq(KnowledgeDocument::getStatus, "生效")) == 0;

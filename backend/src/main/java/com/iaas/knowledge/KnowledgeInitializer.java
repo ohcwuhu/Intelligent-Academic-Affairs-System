@@ -1,11 +1,11 @@
 package com.iaas.knowledge;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 启动时按需灌入语料。
@@ -14,21 +14,15 @@ import org.springframework.stereotype.Component;
  * 语料缺失不会让应用启动失败，只会把问答降级为「无可用依据」。
  */
 @Component
+@RequiredArgsConstructor
+@Slf4j
 public class KnowledgeInitializer implements ApplicationRunner {
-
-    private static final Logger log = LoggerFactory.getLogger(KnowledgeInitializer.class);
 
     private final KnowledgeIngestService ingestService;
     private final KnowledgeGovernanceService governanceService;
 
     @Value("${iaas.knowledge.auto-ingest:true}")
     private boolean autoIngest;
-
-    public KnowledgeInitializer(KnowledgeIngestService ingestService,
-                                KnowledgeGovernanceService governanceService) {
-        this.ingestService = ingestService;
-        this.governanceService = governanceService;
-    }
 
     @Override
     public void run(ApplicationArguments args) {

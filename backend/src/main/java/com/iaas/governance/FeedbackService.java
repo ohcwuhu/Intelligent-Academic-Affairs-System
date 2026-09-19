@@ -8,6 +8,7 @@ import com.iaas.common.PageResult;
 import com.iaas.common.UserContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.RequiredArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -20,17 +21,13 @@ import java.util.List;
  * 没有这一步，反馈就只是一堆没人看的意见。
  */
 @Service
+@RequiredArgsConstructor
 public class FeedbackService {
 
     private static final List<String> TYPES = List.of("USEFUL", "USELESS", "WRONG");
 
     private final FeedbackMapper feedbackMapper;
     private final KnowledgeGapService gapService;
-
-    public FeedbackService(FeedbackMapper feedbackMapper, KnowledgeGapService gapService) {
-        this.feedbackMapper = feedbackMapper;
-        this.gapService = gapService;
-    }
 
     @Transactional(rollbackFor = Exception.class)
     public Long submit(Feedback req) {

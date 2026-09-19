@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -20,13 +21,10 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/grade")
+@RequiredArgsConstructor
 public class GradeController {
 
     private final EnrollmentService enrollmentService;
-
-    public GradeController(EnrollmentService enrollmentService) {
-        this.enrollmentService = enrollmentService;
-    }
 
     @PostMapping("/save")
     public R<Void> save(@RequestBody ScoreRequest req) {

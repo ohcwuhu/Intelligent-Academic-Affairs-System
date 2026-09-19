@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 
@@ -28,20 +29,13 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/basic")
+@RequiredArgsConstructor
 public class BasicDataController {
 
     private final CollegeMapper collegeMapper;
     private final MajorMapper majorMapper;
     private final ClazzMapper clazzMapper;
     private final TermMapper termMapper;
-
-    public BasicDataController(CollegeMapper collegeMapper, MajorMapper majorMapper,
-                              ClazzMapper clazzMapper, TermMapper termMapper) {
-        this.collegeMapper = collegeMapper;
-        this.majorMapper = majorMapper;
-        this.clazzMapper = clazzMapper;
-        this.termMapper = termMapper;
-    }
 
     @GetMapping("/colleges")
     public R<List<College>> colleges() {

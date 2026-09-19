@@ -8,6 +8,7 @@ import com.iaas.common.PageResult;
 import com.iaas.common.UserContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.RequiredArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -19,16 +20,12 @@ import java.util.List;
  * 不是继续调提示词。所以每次拒答与每一条负反馈都在这里聚合计数。
  */
 @Service
+@RequiredArgsConstructor
 public class KnowledgeGapService {
 
     private static final int KEY_LENGTH = 60;
 
     private final KnowledgeGapMapper mapper;
-
-    public KnowledgeGapService(KnowledgeGapMapper mapper) {
-        this.mapper = mapper;
-    }
-
     /**
      * 记一次缺口。同一个问题重复出现只累加计数。
      * 用归一化后的问法做聚类键，问法微调（多一个语气词）仍归到同一类。

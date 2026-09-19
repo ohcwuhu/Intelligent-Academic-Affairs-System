@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 
@@ -24,6 +25,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/assistant")
+@RequiredArgsConstructor
 public class AssistantController {
 
     private final AssistantService assistantService;
@@ -32,14 +34,6 @@ public class AssistantController {
 
     @Value("${iaas.assistant.enabled:true}")
     private boolean enabled;
-
-    public AssistantController(AssistantService assistantService, LlmClient llmClient,
-                              ConversationService conversationService) {
-        this.assistantService = assistantService;
-        this.llmClient = llmClient;
-        this.conversationService = conversationService;
-    }
-
     /** 能力状态。前端据此决定入口文案，并如实告诉用户当前是哪种模式。 */
     @GetMapping("/status")
     public R<AssistantDtos.Status> status() {

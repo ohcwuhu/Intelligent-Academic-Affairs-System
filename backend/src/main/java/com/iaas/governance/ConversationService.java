@@ -5,6 +5,7 @@ import com.iaas.common.BizException;
 import com.iaas.common.UserContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.RequiredArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -17,6 +18,7 @@ import java.util.List;
  * 后者既浪费带宽，也让"最近 5 轮"这条规则可以被客户端随意绕过。
  */
 @Service
+@RequiredArgsConstructor
 public class ConversationService {
 
     /** 参与指代消解的最近轮数。 */
@@ -24,13 +26,6 @@ public class ConversationService {
 
     private final ChatConversationMapper conversationMapper;
     private final ChatMessageMapper messageMapper;
-
-    public ConversationService(ChatConversationMapper conversationMapper,
-                               ChatMessageMapper messageMapper) {
-        this.conversationMapper = conversationMapper;
-        this.messageMapper = messageMapper;
-    }
-
     /** 取会话；不存在则新建。会话必须属于当前用户。 */
     @Transactional(rollbackFor = Exception.class)
     public Long ensureConversation(Long conversationId, String firstQuestion) {

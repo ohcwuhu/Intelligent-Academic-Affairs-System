@@ -13,6 +13,7 @@ import com.iaas.teaching.entity.TeachingClass;
 import com.iaas.teaching.mapper.TeachingClassMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.RequiredArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,6 +30,7 @@ import java.util.stream.Collectors;
  * 与选课阶段的"学生课表冲突"是两回事：前者约束排课者，后者提示选课者。
  */
 @Service
+@RequiredArgsConstructor
 public class TeachingClassService {
 
     private static final String OPEN = "开放";
@@ -37,17 +39,6 @@ public class TeachingClassService {
     private final CourseMapper courseMapper;
     private final TeacherMapper teacherMapper;
     private final TermMapper termMapper;
-
-    public TeachingClassService(TeachingClassMapper teachingClassMapper,
-                                CourseMapper courseMapper,
-                                TeacherMapper teacherMapper,
-                                TermMapper termMapper) {
-        this.teachingClassMapper = teachingClassMapper;
-        this.courseMapper = courseMapper;
-        this.teacherMapper = teacherMapper;
-        this.termMapper = termMapper;
-    }
-
     public List<TeachingClassDtos.TeachingClassVO> list(Long termId, Long courseId,
                                                         Long teacherId, boolean onlyOpen) {
         var query = Wrappers.<TeachingClass>lambdaQuery()

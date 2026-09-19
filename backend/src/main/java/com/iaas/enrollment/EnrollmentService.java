@@ -22,6 +22,7 @@ import com.iaas.teaching.mapper.TeachingClassMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -47,6 +48,7 @@ import java.util.stream.Collectors;
  * </ol>
  */
 @Service
+@RequiredArgsConstructor
 public class EnrollmentService {
 
     private static final String SELECTED = "SELECTED";
@@ -64,25 +66,6 @@ public class EnrollmentService {
 
     @Value("${iaas.enrollment.open:true}")
     private boolean enrollmentOpen;
-
-    public EnrollmentService(EnrollmentMapper enrollmentMapper,
-                             TeachingClassMapper teachingClassMapper,
-                             CourseMapper courseMapper,
-                             TeacherMapper teacherMapper,
-                             TermMapper termMapper,
-                             StudentMapper studentMapper,
-                             ClazzMapper clazzMapper,
-                             MajorMapper majorMapper) {
-        this.enrollmentMapper = enrollmentMapper;
-        this.teachingClassMapper = teachingClassMapper;
-        this.courseMapper = courseMapper;
-        this.teacherMapper = teacherMapper;
-        this.termMapper = termMapper;
-        this.studentMapper = studentMapper;
-        this.clazzMapper = clazzMapper;
-        this.majorMapper = majorMapper;
-    }
-
     // ------------------------------------------------------------------
     // 查询
     // ------------------------------------------------------------------

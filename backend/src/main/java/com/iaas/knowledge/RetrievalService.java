@@ -3,6 +3,7 @@ package com.iaas.knowledge;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.iaas.common.UserContext;
 import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -26,6 +27,7 @@ import java.util.stream.Collectors;
  * 直接加权需要调参且换模型就失效。
  */
 @Service
+@RequiredArgsConstructor
 public class RetrievalService {
 
     /** RRF 融合常数，经验值 60，作用是压低头部排名的绝对优势。 */
@@ -71,13 +73,6 @@ public class RetrievalService {
 
     private final KnowledgeDocumentMapper documentMapper;
     private final KnowledgeChunkMapper chunkMapper;
-
-    public RetrievalService(KnowledgeDocumentMapper documentMapper,
-                            KnowledgeChunkMapper chunkMapper) {
-        this.documentMapper = documentMapper;
-        this.chunkMapper = chunkMapper;
-    }
-
     /**
      * 检索命中的一条切片。
      *

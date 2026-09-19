@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 
@@ -21,6 +22,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/knowledge")
+@RequiredArgsConstructor
 public class KnowledgeController {
 
     private final KnowledgeDocumentMapper documentMapper;
@@ -28,19 +30,6 @@ public class KnowledgeController {
     private final KnowledgeIngestService ingestService;
     private final RetrievalService retrievalService;
     private final KnowledgeGovernanceService governanceService;
-
-    public KnowledgeController(KnowledgeDocumentMapper documentMapper,
-                               KnowledgeChunkMapper chunkMapper,
-                               KnowledgeIngestService ingestService,
-                               RetrievalService retrievalService,
-                               KnowledgeGovernanceService governanceService) {
-        this.documentMapper = documentMapper;
-        this.chunkMapper = chunkMapper;
-        this.ingestService = ingestService;
-        this.retrievalService = retrievalService;
-        this.governanceService = governanceService;
-    }
-
     /** 文档列表。只返回当前身份有权看到的文档。 */
     @GetMapping("/documents")
     public R<List<KnowledgeDocument>> documents() {

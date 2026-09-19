@@ -1,9 +1,9 @@
 package com.iaas.governance;
 
 import com.iaas.common.UserContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
 
@@ -18,19 +18,14 @@ import java.time.LocalDateTime;
  * </ol>
  */
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class AuditService {
-
-    private static final Logger log = LoggerFactory.getLogger(AuditService.class);
 
     /** 问题字段上限，超出截断，避免一条超长输入撑爆审计行。 */
     private static final int MAX_QUESTION = 480;
 
     private final AuditLogMapper mapper;
-
-    public AuditService(AuditLogMapper mapper) {
-        this.mapper = mapper;
-    }
-
     public void ask(String question, String intent, String mode, int hitCount,
                     int citationCount, boolean blocked, String reason, long durationMs) {
         AuditLog entry = base("ASK");

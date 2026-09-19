@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
+import lombok.RequiredArgsConstructor;
 
 /**
  * 鉴权拦截器。
@@ -12,13 +13,10 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * 按数据范围过滤，二者不可混淆。这是 PRD 原则 PR2（先鉴权，后检索）的落点。
  */
 @Component
+@RequiredArgsConstructor
 public class AuthInterceptor implements HandlerInterceptor {
 
     private final JwtUtil jwtUtil;
-
-    public AuthInterceptor(JwtUtil jwtUtil) {
-        this.jwtUtil = jwtUtil;
-    }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
