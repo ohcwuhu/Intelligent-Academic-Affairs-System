@@ -199,6 +199,10 @@ public class EnrollmentService {
 
         List<EnrollmentDtos.ConflictItem> result = new ArrayList<>();
         for (TeachingClass other : tcMap.values()) {
+            // 已选上这门课时不要跟自己比：那会报出"数据结构 与 数据结构 冲突"这种废话
+            if (other.getId().equals(target.getId())) {
+                continue;
+            }
             if (TimeConflictChecker.conflicts(target, other)) {
                 result.add(new EnrollmentDtos.ConflictItem(
                         courseName(courseMap, target), TimeConflictChecker.describe(target),
@@ -301,6 +305,17 @@ public class EnrollmentService {
             throw new BizException("本学期已选过该课程的其它教学班，不能重复选课");
         }
 
+        // 时间冲突：拦在这里而不是"选上了再提示"。
+        // 界面上冲突课程本来就不给选课入口，接口再放行就等于两套说法；
+        // 而两门课压在同一个时段这件事，学生自己很难在选课那一刻发现。
+        List<EnrollmentDtos.ConflictItem> conflicts = previewConflicts(studentId, teachingClassId);
+        if (!conflicts.isEmpty()) {
+            EnrollmentDtos.ConflictItem c = conflicts.get(0);
+            throw new BizException(400, "与已选课程时间冲突：" + c.courseB() + "（" + c.timeB()
+                    + "）与本课程（" + c.timeA() + "）重叠。"
+                    + "如确需修读，请按学生手册第二十三条申请免听或间听后再办理。");
+        }
+
         // 容量：条件更新，enrolled < capacity 才 +1，可靠地防止并发超选
         int affected = teachingClassMapper.update(null,
                 Wrappers.<TeachingClass>lambdaUpdate()
@@ -310,8 +325,6 @@ public class EnrollmentService {
         if (affected == 0) {
             throw new BizException("该教学班名额已满");
         }
-
-        List<EnrollmentDtos.ConflictItem> conflicts = previewConflicts(studentId, teachingClassId);
 
         // 此前退过这门课时复用原记录，否则会撞唯一键
         Enrollment dropped = enrollmentMapper.selectOne(
@@ -338,10 +351,7 @@ public class EnrollmentService {
             enrollmentId = e.getId();
         }
 
-        String message = conflicts.isEmpty()
-                ? "选课成功"
-                : "选课成功，但该课程与已选课程存在时间冲突，请自行确认";
-        return new EnrollmentDtos.SelectResult(enrollmentId, message, conflicts);
+        return new EnrollmentDtos.SelectResult(enrollmentId, "选课成功", List.of());
     }
 
     /** 学生退课。 */

@@ -75,11 +75,8 @@ async function choose(c: TeachingClassVO) {
   busyId.value = c.id
   try {
     const res = await enrollmentApi.select(c.id)
-    if (res.conflicts?.length) {
-      toast(`${res.message}：${res.conflicts[0].courseA} 与 ${res.conflicts[0].courseB}`, 'bad', 6000)
-    } else {
-      toast(res.message || '选课成功', 'ok')
-    }
+    // 冲突在列表里就已经封条拦住，接口也会再拦一次；能走到这里就是真的选上了
+    toast(res.message || '选课成功', 'ok')
     await load()
   } catch (e) {
     toast(e instanceof ApiError ? e.message : '选课失败', 'bad')
