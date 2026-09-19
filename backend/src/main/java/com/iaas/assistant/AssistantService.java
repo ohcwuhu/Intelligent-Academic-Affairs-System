@@ -117,6 +117,12 @@ public class AssistantService {
         List<RetrievalService.RetrievedChunk> hits = retrievalService.retrieve(question, TOP_K);
 
         if (hits.isEmpty() || !retrievalService.hasSufficientEvidence(question, hits)) {
+            // 先分清是"没人写"还是"不该问"：
+            // 领域内没依据才是知识缺口，要进治理台待办；
+            // 领域外的问题（篮球队什么时候招人）拒答就完了，记成缺口只会把待办列表灌满
+            if (!RetrievalService.inDomain(question)) {
+                return refusal(question, convId);
+            }
             String reason = hits.isEmpty() ? "检索未命中任何生效条款" : "检索到的条款相关度过低";
             // 拒答不是终点，是知识缺口待办
             gapService.record(question, reason);

@@ -39,6 +39,16 @@ public class IntentRouter {
             "成绩", "学分", "绩点", "平均分", "课表", "选课", "成绩单",
             "排名", "学籍", "档案", "已修", "在修");
 
+    /**
+     * 个人数据的组合判定：先出现"我/自己/本人"，随后提到某项个人数据。
+     *
+     * <p>光靠名词表会漏「我这学期选了几门课」——问句里没有"选课"这个连续词，
+     * 只有"选了几门课"。所以除了名词表，还要认动词与量词的说法。
+     */
+    private static final Pattern PERSONAL_COMBO = Pattern.compile(
+            "(我|自己|本人).{0,8}(成绩|学分|绩点|平均分|课表|选课|选上|选了|已选|在修|修了|"
+                    + "几门课|多少门课|哪些课|排名|学籍|档案|成绩单)");
+
     /** 敏感属性：问这些且不是在问自己，一律按越权处理。 */
     private static final List<String> SENSITIVE_ATTRS = List.of(
             "电话", "手机号", "身份证", "邮箱", "住址", "家庭住址", "联系方式", "学号");
@@ -79,7 +89,9 @@ public class IntentRouter {
         if (OFF_TOPIC.stream().anyMatch(q::contains)) {
             return Intent.OUT_OF_SCOPE;
         }
-        if (mentionsSelf(q) && PERSONAL_DATA_NOUNS.stream().anyMatch(q::contains)) {
+        if (mentionsSelf(q)
+                && (PERSONAL_COMBO.matcher(q).find()
+                || PERSONAL_DATA_NOUNS.stream().anyMatch(q::contains))) {
             return Intent.PERSONAL;
         }
         // 要别人的联系方式、身份证之类的，不管问法如何都拦掉

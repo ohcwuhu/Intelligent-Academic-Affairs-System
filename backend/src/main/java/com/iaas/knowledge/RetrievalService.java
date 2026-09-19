@@ -69,7 +69,11 @@ public class RetrievalService {
             Map.entry("被抓", "违纪 处分"),
             Map.entry("交钱", "收费 费用 缴交"),
             Map.entry("开除", "退学 处分"),
-            Map.entry("补考", "补考 不及格"));
+            Map.entry("补考", "补考 不及格"),
+            // 「一学期最多能选多少学分」实测只靠字面召回会落到休学、考核方式那几条，
+            // 因为"学期""学分"在手冊里到处都是，区分度太低；补上条款原词才排得到第十七条
+            Map.entry("多少学分", "修读理论课程学分"),
+            Map.entry("学分上限", "修读理论课程学分"));
 
     private final KnowledgeDocumentMapper documentMapper;
     private final KnowledgeChunkMapper chunkMapper;
@@ -162,6 +166,20 @@ public class RetrievalService {
         return DOMAIN_TERMS.stream().anyMatch(question::contains);
     }
 
+    /**
+     * 问题是否落在教务领域内。口语改写后带出领域词的也算，
+     * 例如「挂了怎么办」本身没有领域词，但改写会补上"不及格/重修"。
+     *
+     * <p>判定结果决定了两件不同的事：领域内但没依据是知识缺口，要记进治理台；
+     * 领域外是越界提问，拒答即可，记成缺口只会把待办列表灌满无关问题。
+     */
+    public static boolean inDomain(String question) {
+        if (question == null || question.isBlank()) {
+            return false;
+        }
+        return hasDomainTerm(question) || hasDomainTerm(rewriteQuery(normalizeQuery(question)));
+    }
+
     /** 清洗查询串：去掉标点与多余空白，保留全部实词。 */
     static String normalizeQuery(String question) {
         String cleaned = question.replaceAll("[\\p{Punct}，。？！、；：（）《》“”‘’【】\\s]+", " ").strip();
@@ -218,11 +236,30 @@ public class RetrievalService {
         for (List<RetrievedChunk> channel : channels) {
             accumulate(channel, score, byId);
         }
-        return score.entrySet().stream()
+        List<RetrievedChunk> ranked = score.entrySet().stream()
                 .sorted(Map.Entry.<Long, Double>comparingByValue(Comparator.reverseOrder()))
-                .limit(limit)
                 .map(e -> withScore(byId.get(e.getKey()), e.getValue()))
                 .toList();
+
+        // 每条通道的头两名先占位，再用融合分补齐、截断。
+        // 理由：改写通道存在的意义就是补召回，实测「一学期最多能选多少学分」
+        // 在改写通道里第十七条排第二，但它的查询词更专指，融合分算不过两条通道都进前几名的
+        // 通用条款，直接被挤出前五——那这条通道就等于白开了。
+        // 留位不等于让位：占位后仍按融合分补齐，只是保证每条通道的头部不被整体洗掉。
+        Map<Long, RetrievedChunk> out = new LinkedHashMap<>();
+        for (List<RetrievedChunk> channel : channels) {
+            for (int i = 0; i < Math.min(2, channel.size()); i++) {
+                RetrievedChunk c = channel.get(i);
+                out.putIfAbsent(c.chunkId(), withScore(c, score.getOrDefault(c.chunkId(), 0.0)));
+            }
+        }
+        for (RetrievedChunk c : ranked) {
+            if (out.size() >= limit) {
+                break;
+            }
+            out.putIfAbsent(c.chunkId(), c);
+        }
+        return out.values().stream().limit(limit).toList();
     }
 
     private void accumulate(List<RetrievedChunk> list, Map<Long, Double> score,
