@@ -1,0 +1,345 @@
+/** 与后端 com.iaas 各 DTO 一一对应的类型。字段名保持与接口一致，不做本地改名。 */
+
+export type Role = 'ADMIN' | 'ACADEMIC' | 'TEACHER' | 'STUDENT'
+
+export interface ApiEnvelope<T> {
+  code: number
+  message: string
+  data: T
+}
+
+export interface PageResult<T> {
+  total: number
+  page: number
+  size: number
+  records: T[]
+}
+
+export interface UserInfo {
+  id: number
+  username: string
+  realName: string
+  role: Role
+  refId: number | null
+}
+
+export interface LoginResponse {
+  token: string
+  expiresIn: number
+  user: UserInfo
+}
+
+/** 一条选课记录（含成绩）。 */
+export interface MyCourse {
+  enrollmentId: number
+  teachingClassId: number
+  teachingClassCode: string
+  courseCode: string
+  courseName: string
+  credit: number
+  courseType: string
+  teacherName: string | null
+  termName: string | null
+  classroom: string | null
+  timeText: string
+  weekday: number
+  startSection: number
+  endSection: number
+  score: number | null
+  scoreStatus: string
+  gradePoint: number | null
+  enrollStatus: string
+}
+
+export interface CreditSummary {
+  earnedCredit: number
+  inProgressCredit: number
+  gpa: number
+  passedCourses: number
+  failedCourses: number
+  inProgressCourses: number
+}
+
+export interface ConflictItem {
+  courseA: string
+  timeA: string
+  courseB: string
+  timeB: string
+}
+
+export interface SelectResult {
+  enrollmentId: number
+  message: string
+  conflicts: ConflictItem[]
+}
+
+export interface TeachingClassVO {
+  id: number
+  code: string
+  courseId: number
+  courseCode: string
+  courseName: string
+  credit: number
+  courseType: string
+  teacherId: number
+  teacherName: string
+  termId: number
+  termName: string
+  capacity: number
+  enrolled: number
+  remaining: number
+  weekday: number
+  startSection: number
+  endSection: number
+  startWeek: number
+  endWeek: number
+  weekType: string
+  classroom: string
+  status: string
+  timeText: string
+}
+
+export interface RosterItem {
+  enrollmentId: number
+  studentId: number
+  studentNo: string
+  studentName: string
+  clazzName: string | null
+  majorName: string | null
+  score: number | null
+  scoreStatus: string
+  gradePoint: number | null
+  passed: boolean
+}
+
+export interface StudentVO {
+  id: number
+  studentNo: string
+  name: string
+  gender: string
+  birthDate: string | null
+  phone: string | null
+  email: string | null
+  collegeId: number
+  collegeName: string
+  majorId: number
+  majorName: string
+  clazzId: number
+  clazzName: string
+  grade: number
+  status: string
+}
+
+export interface Course {
+  id: number
+  code: string
+  name: string
+  credit: number
+  hours: number
+  courseType: string
+  collegeId: number
+  assessType: string
+  status: number
+}
+
+export interface Teacher {
+  id: number
+  teacherNo: string
+  name: string
+  gender: string
+  title: string | null
+  collegeId: number
+  phone: string | null
+  email: string | null
+  status: string
+}
+
+export interface College {
+  id: number
+  code: string
+  name: string
+}
+
+export interface Major {
+  id: number
+  code: string
+  name: string
+  collegeId: number
+}
+
+export interface Clazz {
+  id: number
+  code: string
+  name: string
+  majorId: number
+  grade: number
+}
+
+export interface Term {
+  id: number
+  code: string
+  name: string
+  startDate: string
+  endDate: string
+  isCurrent: number
+}
+
+export interface TimetableEntry {
+  courseName: string
+  courseCode: string
+  teacherName: string | null
+  className: string | null
+  classroom: string
+  weekday: number
+  startSection: number
+  endSection: number
+  timeText: string
+  credit: number
+}
+
+export interface Timetable {
+  termId: number
+  entries: TimetableEntry[]
+}
+
+export interface ScheduleConflict {
+  type: 'TEACHER' | 'CLASSROOM'
+  conflictWith: string
+  timeText: string
+  teachingClassId: number
+}
+
+export interface TeachingClassSaveResult {
+  id: number
+  conflicts: ScheduleConflict[]
+}
+
+export interface AppUser {
+  id: number
+  username: string
+  realName: string
+  role: Role
+  refId: number | null
+  status: number
+  lastLogin: string | null
+}
+
+// ---- 智能问答与治理 ----
+
+export interface AssistantStatus {
+  enabled: boolean
+  llmReady: boolean
+  provider: string
+  model: string
+  message: string
+}
+
+/** 一条引用。excerpt 是逐字原文，不改写。 */
+export interface Citation {
+  chunkId: number
+  documentId: number
+  documentTitle: string
+  docNo: string | null
+  dept: string
+  effectiveDate: string | null
+  hierarchyPath: string
+  articleNo: string | null
+  excerpt: string
+}
+
+/** 一次问答的结果。intent 与 mode 是能力边界，界面据实呈现，不美化。 */
+export interface AssistantAnswer {
+  intent: 'RULE' | 'PERSONAL' | 'PROCESS' | 'OUT_OF_SCOPE' | 'AMBIGUOUS'
+  mode: 'generated' | 'extractive' | 'process' | 'tool' | 'refusal' | 'clarify'
+  answer: string
+  citations: Citation[]
+  notes: string[]
+  data: Record<string, unknown> | null
+  conversationId: number | null
+  durationMs: number
+}
+
+export interface KnowledgeChunkDetail {
+  id: number
+  documentId: number
+  hierarchyPath: string
+  articleNo: string | null
+  content: string
+}
+
+export interface KnowledgeStats {
+  documents: number
+  chunks: number
+}
+
+export interface KnowledgeDocumentRow {
+  id: number
+  title: string
+  docNo: string | null
+  dept: string
+  effectiveDate: string | null
+  expireDate: string | null
+  scope: string
+  visibility: string
+  status: string
+  auditor: string | null
+  chunkCount: number
+}
+
+export interface GovernanceOverview {
+  pendingFeedback: number
+  pendingGap: number
+  askToday: number
+  blockedToday: number
+  injectionToday: number
+  avgDurationMs: number
+}
+
+export interface FeedbackRow {
+  id: number
+  userId: number
+  username: string | null
+  role: string | null
+  question: string
+  answerMode: string | null
+  answerDigest: string | null
+  citationPath: string | null
+  type: 'USEFUL' | 'USELESS' | 'WRONG'
+  detail: string | null
+  status: string
+  handler: string | null
+  handleNote: string | null
+  handledAt: string | null
+  createdAt: string
+}
+
+export interface KnowledgeGapRow {
+  id: number
+  questionKey: string
+  sampleQuestion: string
+  hitCount: number
+  reason: string | null
+  dept: string | null
+  status: string
+  assignee: string | null
+  note: string | null
+  handledAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AuditRow {
+  id: number
+  eventType: string
+  username: string | null
+  role: string | null
+  question: string | null
+  intent: string | null
+  mode: string | null
+  hitCount: number | null
+  citationCount: number | null
+  blocked: number
+  reason: string | null
+  durationMs: number | null
+  createdAt: string
+}

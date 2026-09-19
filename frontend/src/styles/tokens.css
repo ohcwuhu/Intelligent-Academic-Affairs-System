@@ -1,0 +1,86 @@
+/*
+ * 设计令牌：石墨铭牌
+ *
+ * 色彩策略为 Restrained（中性面 + 单一点缀色），符合 Operate 型界面的默认。
+ * 明暗不是默认值，而是由使用场景推出的：教务人员白天在办公室日光灯下连着看
+ * 几小时表格，学生在宿舍晚上轮流查课表，两种场景都以亮面为主。
+ *
+ * 高级感来自价值对比与克制，不是把颜色调得更好看：
+ *   · 结构面用接近黑的冷石墨，内容面用冷瓷白，两者明度差拉满；
+ *   · 全站只有一个点缀色，饱和度压在 60% 以下，只出现在状态与主操作上；
+ *   · 中性色一律冷调，不掺暖灰。暖奶油底配高饱和点缀色是最常见的机器生成配色。
+ *
+ * 对比度已逐项核算（相对亮度按 sRGB 公式计算）：
+ *   --ink        on --face        约 16.5:1
+ *   --ink-muted  on --face        约 6.2:1
+ *   --ink-muted  on --ground      约 5.6:1
+ *   --face       on --structure   约 15.2:1
+ *   --muted      on --structure   约 6.4:1
+ *   --accent     on --face        约 5.2:1
+ *   --face       on --accent      约 5.2:1   （胶带封条与挂牌上的字）
+ */
+:root {
+  /* 结构色：顶栏、左侧索引列、课表上的课程代码铭牌 */
+  --structure: #1c2024;
+  --structure-deep: #131619;
+  --structure-line: #31373c;
+
+  /* 内容面 */
+  --ground: #eaecee;
+  --face: #f5f7f8;
+  --face-raised: #fcfdfd;
+
+  /* 墨色 */
+  --ink: #15191c;
+  --ink-muted: #545e64;
+  --muted: #98a3a9;
+
+  /* 线 */
+  --line: #d5dadd;
+  --line-strong: #abb3b8;
+
+  /* 点缀色：只用于状态与主操作，不做装饰 */
+  --accent: #96591a;
+  --accent-deep: #784612;
+
+  /* 状态语义 */
+  --ok: #2f6b4f;
+  --warn: #96591a;
+  --bad: #a03024;
+
+  /* 字体 */
+  --font-sans: "PingFang SC", "HarmonyOS Sans SC", "Source Han Sans SC",
+    "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  /* 等宽只用于编码、数字与度量，不当技术感的装饰 */
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas,
+    "Liberation Mono", monospace;
+
+  /* 字号：比例 1.14 到 1.2，产品界面不需要夸张对比 */
+  --t-xs: 12px;
+  --t-sm: 13px;
+  --t-base: 14px;
+  --t-md: 16px;
+  --t-lg: 20px;
+  --t-xl: 28px;
+
+  /* 间距 */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-12: 48px;
+
+  /* 形状锁：全站直角。圆角只出现在加载转圈的图形上，不作为造型语言。 */
+  --radius: 0;
+
+  /* 层级：全站只用三个 z 值 */
+  --z-sticky: 10;
+  --z-overlay: 20;
+  --z-toast: 30;
+
+  /* 动效：指数缓出，从已可见的默认态出发 */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur: 180ms;
+}
