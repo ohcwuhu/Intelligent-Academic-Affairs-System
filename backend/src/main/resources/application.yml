@@ -1,0 +1,68 @@
+server:
+  port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+spring:
+  config:
+    # 本地密钥放同目录的 config.local.yml，文件不存在也不影响启动
+    import: optional:file:./config.local.yml
+  application:
+    name: iaas-backend
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # characterEncoding 必须是 Java 字符集名（UTF-8），
+    # 写成 MySQL 的 utf8mb4 会直接报 Unsupported character encoding
+    url: jdbc:mysql://localhost:3306/iaas?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    # 口令必须加引号：以 0 开头的纯数字会被 YAML 当八进制解析（051204 变成 21060）
+    password: "051204"
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+  jackson:
+    # 不要用 non_null 省略空字段：字段时有时无会让前端把 null 误当 undefined
+    default-property-inclusion: always
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+
+iaas:
+  jwt:
+    # 开发用密钥。部署前必须替换，且不得提交到公开仓库。
+    secret: iaas-dev-secret-key-please-change-in-production-2026
+    ttl-hours: 12
+  enrollment:
+    open: true
+  assistant:
+    enabled: true
+    llm:
+      # none = 不调模型，直接返回检索到的原文（检索与引用链路照常工作）
+      # ollama = 调用本机 Ollama，数据不出校
+      # deepseek / openai / compatible = 调用 OpenAI 兼容接口
+      provider: ${IAAS_LLM_PROVIDER:none}
+      timeout-seconds: 120
+      ollama:
+        base-url: http://127.0.0.1:11434
+        model: qwen3:8b
+      openai:
+        base-url: https://api.deepseek.com/v1
+        model: deepseek-chat
+        api-key: ${IAAS_LLM_KEY:}
+  knowledge:
+    source-path: ${IAAS_KB_PATH:D:/Desktop/福州大学至诚学院学生手册.md}
+    auto-ingest: true
+
+logging:
+  level:
+    com.iaas: info
