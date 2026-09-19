@@ -77,7 +77,10 @@ public class FeedbackService {
         var q = Wrappers.<Feedback>lambdaQuery()
                 .eq(status != null && !status.isBlank(), Feedback::getStatus, status)
                 .eq(type != null && !type.isBlank(), Feedback::getType, type)
-                .orderByAsc(Feedback::getStatus)
+                // 待办在前。handled_at 为空就是还没处理，MySQL 里 NULL 最小，
+                // 所以按它升序排等于"未处理优先"；原来按状态字符串排是反的——
+                // 「已修正」的码点比「待处理」小，处理完的反而排在最上面。
+                .orderByAsc(Feedback::getHandledAt)
                 .orderByDesc(Feedback::getCreatedAt);
         IPage<Feedback> p = feedbackMapper.selectPage(new Page<>(page, size), q);
         return new PageResult<>(p.getTotal(), p.getCurrent(), p.getSize(), p.getRecords());

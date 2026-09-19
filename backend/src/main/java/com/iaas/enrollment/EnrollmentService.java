@@ -400,12 +400,18 @@ public class EnrollmentService {
                 || score.compareTo(new BigDecimal("100")) > 0)) {
             throw new BizException("成绩必须在 0 到 100 之间");
         }
-        e.setScore(score);
-        e.setGradePoint(GradePointCalculator.toGradePoint(score));
-        e.setScoreStatus(score == null
+        BigDecimal gradePoint = GradePointCalculator.toGradePoint(score);
+        String status = score == null
                 ? "未录入"
-                : (scoreStatus == null || scoreStatus.isBlank() ? "已录入" : scoreStatus));
-        enrollmentMapper.updateById(e);
+                : (scoreStatus == null || scoreStatus.isBlank() ? "已录入" : scoreStatus);
+        // 这里必须显式 set，不能用 updateById：
+        // MyBatis-Plus 默认跳过 null 字段，撤销录入时 score 会原地不动，
+        // 结果就是「分数还是 88、状态却是未录入」，学分与绩点统计跟着一起错。
+        enrollmentMapper.update(null, Wrappers.<Enrollment>lambdaUpdate()
+                .eq(Enrollment::getId, enrollmentId)
+                .set(Enrollment::getScore, score)
+                .set(Enrollment::getGradePoint, gradePoint)
+                .set(Enrollment::getScoreStatus, status));
     }
 
     /**

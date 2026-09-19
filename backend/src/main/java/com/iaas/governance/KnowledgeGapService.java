@@ -63,6 +63,9 @@ public class KnowledgeGapService {
         requireStaff();
         var q = Wrappers.<KnowledgeGap>lambdaQuery()
                 .eq(status != null && !status.isBlank(), KnowledgeGap::getStatus, status)
+                // 同 FeedbackService：未处理的（handled_at 为空）排前面，
+                // 再按出现次数排，最后才看更新时间
+                .orderByAsc(KnowledgeGap::getHandledAt)
                 .orderByDesc(KnowledgeGap::getHitCount)
                 .orderByDesc(KnowledgeGap::getUpdatedAt);
         IPage<KnowledgeGap> p = mapper.selectPage(new Page<>(page, size), q);
