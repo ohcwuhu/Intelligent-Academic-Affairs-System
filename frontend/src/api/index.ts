@@ -4,6 +4,8 @@ import type {
   AssistantAnswer,
   AssistantStatus,
   AuditRow,
+  ChatConversation,
+  ChatMessage,
   Clazz,
   College,
   Course,
@@ -107,6 +109,8 @@ export const assistantApi = {
   status: () => get<AssistantStatus>('/assistant/status'),
   ask: (question: string, conversationId?: number | null) =>
     post<AssistantAnswer>('/assistant/ask', { question, conversationId }),
+  conversations: () => get<ChatConversation[]>('/assistant/conversations'),
+  conversationMessages: (id: number) => get<ChatMessage[]>(`/assistant/conversations/${id}`),
 }
 
 export const knowledgeApi = {
@@ -123,6 +127,7 @@ export const knowledgeApi = {
     post<void>(`/knowledge/documents/${id}/publish`, {}, { force, reason }),
   expire: (id: number, reason?: string) =>
     post<void>(`/knowledge/documents/${id}/expire`, {}, { reason }),
+  expiring: (days = 30) => get<KnowledgeDocumentRow[]>('/knowledge/documents/expiring', { days }),
   reingest: () => post<number>('/knowledge/reingest'),
 }
 

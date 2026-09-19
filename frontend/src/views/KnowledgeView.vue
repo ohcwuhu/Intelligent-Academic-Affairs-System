@@ -23,6 +23,7 @@ const stats = ref<{ documents: number; chunks: number } | null>(null)
 const state = ref<'loading' | 'ready' | 'empty' | 'error'>('loading')
 const errorDetail = ref('')
 const gateIssues = ref<{ id: number; list: string[] } | null>(null)
+const expiring = ref<KnowledgeDocumentRow[]>([])
 const quality = ref<{
   id: number
   total: number
@@ -45,9 +46,14 @@ const columns: Column[] = [
 async function load() {
   state.value = 'loading'
   try {
-    const [docs, s] = await Promise.all([knowledgeApi.documents(), knowledgeApi.stats()])
+    const [docs, s, exp] = await Promise.all([
+      knowledgeApi.documents(),
+      knowledgeApi.stats(),
+      knowledgeApi.expiring(90).catch(() => [] as KnowledgeDocumentRow[]),
+    ])
     rows.value = docs
     stats.value = s
+    expiring.value = exp
     state.value = docs.length ? 'ready' : 'empty'
   } catch (e) {
     state.value = 'error'
@@ -179,9 +185,54 @@ async function reingest() {
       </DataTable>
     </StateHost>
   </Plate>
+
+  <Plate
+    title="到期提醒"
+    note="未来 90 天内失效的文档。到期前要续期或出替代版本，否则检索会静默少掉一块依据"
+  >
+    <ul v-if="expiring.length" class="due">
+      <li v-for="d in expiring" :key="d.id" class="due__row">
+        <span class="due__title">{{ d.title }}</span>
+        <span class="due__meta">
+          {{ d.dept }} · {{ d.effectiveDate ?? '未登记' }} 起
+          <template v-if="d.expireDate"> · {{ d.expireDate }} 失效</template>
+          <template v-else> · 未设失效日期</template>
+        </span>
+        <StatusPlate :value="d.status" />
+      </li>
+    </ul>
+    <p v-else class="due__none">
+      近期没有到期的文档。当前语料未设失效日期的按长期有效处理。
+    </p>
+  </Plate>
 </template>
 
 <style scoped>
+.due {
+  list-style: none;
+}
+.due__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--line);
+}
+.due__row:last-child {
+  border-bottom: 0;
+}
+.due__title {
+  flex: 1;
+}
+.due__meta {
+  font-size: var(--t-sm);
+  color: var(--ink-muted);
+}
+.due__none {
+  padding: var(--s-4);
+  color: var(--ink-muted);
+  font-size: var(--t-sm);
+}
 .panel {
   padding: var(--s-3) var(--s-4);
   border-bottom: 1px solid var(--line);

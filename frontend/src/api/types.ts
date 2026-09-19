@@ -259,6 +259,26 @@ export interface AssistantAnswer {
   durationMs: number
 }
 
+export interface ChatConversation {
+  id: number
+  userId: number
+  title: string
+  turnCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ChatMessage {
+  id: number
+  conversationId: number
+  role: 'user' | 'assistant' | string
+  content: string
+  intent: string | null
+  mode: string | null
+  citationPaths: string | null
+  createdAt: string
+}
+
 export interface KnowledgeChunkDetail {
   id: number
   documentId: number

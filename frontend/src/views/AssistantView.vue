@@ -9,7 +9,14 @@
 import { computed, onMounted, ref } from 'vue'
 import { ApiError } from '@/api/client'
 import { assistantApi, feedbackApi, knowledgeApi } from '@/api'
-import type { AssistantAnswer, AssistantStatus, Citation, KnowledgeChunkDetail } from '@/api/types'
+import type {
+  AssistantAnswer,
+  AssistantStatus,
+  ChatConversation,
+  ChatMessage,
+  Citation,
+  KnowledgeChunkDetail,
+} from '@/api/types'
 import Plate from '@/components/Plate.vue'
 import Btn from '@/components/Btn.vue'
 import StatusPlate from '@/components/StatusPlate.vue'
@@ -19,6 +26,8 @@ interface Turn {
   question: string
   answer: AssistantAnswer
   feedback: '' | 'USEFUL' | 'USELESS' | 'WRONG'
+  /** 从会话记录里读回来的历史轮次：只读，不给反馈按钮（当时没评就不补评）。 */
+  history?: boolean
 }
 
 const status = ref<AssistantStatus | null>(null)
@@ -29,6 +38,8 @@ const asking = ref(false)
 const error = ref('')
 const openedChunk = ref<KnowledgeChunkDetail | null>(null)
 const conversationId = ref<number | null>(null)
+const conversations = ref<ChatConversation[]>([])
+const historyState = ref<'loading' | 'ready' | 'empty' | 'error'>('loading')
 let seq = 0
 
 const examples = [
@@ -79,7 +90,74 @@ async function load() {
     error.value = e instanceof ApiError ? e.message : '问答服务不可用'
   }
 }
-onMounted(load)
+
+/**
+ * 会话记录。多轮上下文存在服务端，前端只存一个 conversationId；
+ * 换个设备打开也能接着上次的对话问，所以历史要能读回来。
+ */
+async function loadConversations() {
+  historyState.value = 'loading'
+  try {
+    conversations.value = await assistantApi.conversations()
+    historyState.value = conversations.value.length ? 'ready' : 'empty'
+  } catch {
+    historyState.value = 'error'
+  }
+}
+
+onMounted(() => {
+  void load()
+  void loadConversations()
+})
+
+/** 把会话里的消息按「问—答」配成轮次，复用当前的消息展示。 */
+function toTurns(messages: ChatMessage[]): Turn[] {
+  const built: Turn[] = []
+  let pending: Turn | null = null
+  for (const m of messages) {
+    if (m.role === 'user') {
+      pending = {
+        no: ++seq,
+        question: m.content,
+        feedback: '',
+        history: true,
+        answer: {
+          intent: (m.intent ?? 'RULE') as AssistantAnswer['intent'],
+          mode: (m.mode ?? 'extractive') as AssistantAnswer['mode'],
+          answer: '',
+          citations: [],
+          notes: [],
+          data: null,
+          conversationId: m.conversationId,
+          durationMs: 0,
+        },
+      }
+      built.push(pending)
+    } else if (pending) {
+      pending.answer = { ...pending.answer, answer: m.content }
+      pending = null
+    }
+  }
+  return built
+}
+
+async function openConversation(c: ChatConversation) {
+  error.value = ''
+  try {
+    const messages = await assistantApi.conversationMessages(c.id)
+    turns.value = toTurns(messages).reverse()
+    conversationId.value = c.id
+  } catch (e) {
+    error.value = e instanceof ApiError ? e.message : '会话读取失败'
+  }
+}
+
+/** 开一段新对话：换掉会话 id，模型这边的上下文也就断了。 */
+function newConversation() {
+  conversationId.value = null
+  turns.value = []
+  error.value = ''
+}
 
 async function ask(text?: string) {
   const q = (text ?? question.value).trim()
@@ -94,6 +172,7 @@ async function ask(text?: string) {
     conversationId.value = answer.conversationId
     turns.value.unshift({ no: ++seq, question: q, answer, feedback: '' })
     question.value = ''
+    void loadConversations()
   } catch (e) {
     error.value = e instanceof ApiError ? e.message : '提问失败'
   } finally {
@@ -133,6 +212,11 @@ async function sendFeedback(t: Turn, type: 'USEFUL' | 'USELESS' | 'WRONG') {
 
 <template>
   <Plate title="智能问答" :note="llmHint">
+    <template #actions>
+      <Btn @click="newConversation">开始新对话</Btn>
+      <span v-if="conversationId" class="ask__conv num">会话 #{{ conversationId }}</span>
+    </template>
+
     <div class="ask">
       <form class="ask__form" @submit.prevent="ask()">
         <label class="sr" for="q">要问的问题</label>
@@ -208,6 +292,29 @@ async function sendFeedback(t: Turn, type: 'USEFUL' | 'USELESS' | 'WRONG') {
     </ol>
   </Plate>
 
+  <Plate title="历史对话" note="多轮上下文存在服务端；点开一段可以接着问">
+    <div v-if="historyState === 'ready'" class="conv">
+      <button
+        v-for="c in conversations"
+        :key="c.id"
+        type="button"
+        class="conv__item"
+        :class="{ 'is-here': c.id === conversationId }"
+        @click="openConversation(c)"
+      >
+        <span class="conv__title">{{ c.title || '(无标题)' }}</span>
+        <span class="conv__meta">
+          <span class="num">{{ c.turnCount }}</span> 轮 · {{ (c.updatedAt ?? '').replace('T', ' ').slice(5, 16) }}
+        </span>
+      </button>
+    </div>
+    <p v-else-if="historyState === 'loading'" class="conv__none">正在读取会话记录</p>
+    <p v-else-if="historyState === 'empty'" class="conv__none">
+      还没有历史对话。问过的问题会存成会话，换设备也能接着问。
+    </p>
+    <p v-else class="conv__none">会话记录暂时读不到，问答本身不受影响。</p>
+  </Plate>
+
   <div v-if="openedChunk" class="drawer" role="dialog" aria-modal="true">
     <div class="drawer__panel">
       <header class="drawer__head">
@@ -221,6 +328,54 @@ async function sendFeedback(t: Turn, type: 'USEFUL' | 'USELESS' | 'WRONG') {
 </template>
 
 <style scoped>
+.ask__conv {
+  margin-left: var(--s-3);
+  font-size: var(--t-xs);
+  color: var(--ink-muted);
+}
+
+.conv {
+  display: grid;
+}
+.conv__item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.conv__item:last-child {
+  border-bottom: 0;
+}
+.conv__item:hover {
+  background: var(--ground);
+}
+.conv__item.is-here {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.conv__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conv__meta {
+  flex: none;
+  font-size: var(--t-xs);
+  color: var(--ink-muted);
+}
+.conv__none {
+  padding: var(--s-4);
+  color: var(--ink-muted);
+  font-size: var(--t-sm);
+}
+
 .ask {
   padding: var(--s-4);
   border-bottom: 1px solid var(--line);
