@@ -61,6 +61,19 @@
             <artifactId>spring-security-crypto</artifactId>
         </dependency>
 
+        <!--
+          项目实际运行在 JDK 21 上，Lombok 工作正常（已在 JDK 21 实测：
+          编译产物 major=65，@Data 生成的访问器可用）。
+          注意它只在 JDK 21 有效：同一份代码在 JDK 25 下注解处理器不生效，
+          所以 pom 里把编译目标钉在 21，并锁定 Lombok 版本。
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.42</version>
+            <scope>provided</scope>
+        </dependency>
+
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
