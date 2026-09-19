@@ -108,7 +108,23 @@ public class KnowledgeGovernanceService {
     @Transactional(rollbackFor = Exception.class)
     public void publish(Long id, boolean force, String reason) {
         requireStaff();
-        KnowledgeDocument doc = mustGet(id);
+        doPublish(mustGet(id), force, reason);
+    }
+
+    /**
+     * 系统启动流程使用的发布路径。
+     *
+     * <p>不能走 {@link #publish}：那条路径要求登录用户是教务人员，
+     * 而启动灌入时根本没有请求上下文，会被自己的权限检查挡下来。
+     * 这个缺陷实际发生过——文档灌完停在草稿态，检索一条也召不到。
+     * 这里不跳过门禁，只是把"谁批准的"记为系统。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void publishAsSystem(Long id, boolean force, String reason) {
+        doPublish(mustGet(id), force, reason);
+    }
+
+    private void doPublish(KnowledgeDocument doc, boolean force, String reason) {
         List<String> issues = gateIssues(doc);
         if (!issues.isEmpty()) {
             if (!force) {
@@ -117,7 +133,8 @@ public class KnowledgeGovernanceService {
             if (reason == null || reason.isBlank()) {
                 throw new BizException("强行发布必须说明理由，理由会记入审计");
             }
-            log.warn("强行发布知识库文档 id={} 理由={} 未通过项={}", id, reason, issues);
+            log.warn("强行发布知识库文档 id={} 理由={} 未通过项={}",
+                    doc.getId(), reason, issues);
             auditService.ingest("强行发布《" + doc.getTitle() + "》，未通过项："
                     + String.join("；", issues) + "，理由：" + reason, 0);
         } else {

@@ -46,7 +46,7 @@ public class KnowledgeInitializer implements ApplicationRunner {
             Long docId = ingestService.lastIngestedDocumentId();
             if (docId != null) {
                 try {
-                    governanceService.publish(docId, true,
+                    governanceService.publishAsSystem(docId, true,
                             "演示环境自动灌入：元数据未经教务处确认，仅用于教学演示，不得作为办事依据");
                 } catch (Exception e) {
                     log.warn("自动发布未完成：{}", e.getMessage());
