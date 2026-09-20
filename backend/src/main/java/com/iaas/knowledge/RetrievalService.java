@@ -70,6 +70,10 @@ public class RetrievalService {
             Map.entry("交钱", "收费 费用 缴交"),
             Map.entry("开除", "退学 处分"),
             Map.entry("补考", "补考 不及格"),
+            // 学生说的是"重修"，手册里写的是"重新修读"。
+            // 不补这条的话，"重修需要什么条件"会被第三十九条（双学位证书授予）抢到第一，
+            // 因为那条里也有"已修读"，而真正管重修的第四款排到了后面。
+            Map.entry("重修", "重新修读"),
             // 「一学期最多能选多少学分」实测只靠字面召回会落到休学、考核方式那几条，
             // 因为"学期""学分"在手冊里到处都是，区分度太低；补上条款原词才排得到第十七条
             Map.entry("多少学分", "修读理论课程学分"),
@@ -232,9 +236,10 @@ public class RetrievalService {
 
     private List<RetrievedChunk> fuse(List<List<RetrievedChunk>> channels, int limit) {
         Map<Long, Double> score = new LinkedHashMap<>();
+        Map<Long, Double> bestRaw = new LinkedHashMap<>();
         Map<Long, RetrievedChunk> byId = new LinkedHashMap<>();
         for (List<RetrievedChunk> channel : channels) {
-            accumulate(channel, score, byId);
+            accumulate(channel, score, bestRaw, byId);
         }
         List<RetrievedChunk> ranked = score.entrySet().stream()
                 .sorted(Map.Entry.<Long, Double>comparingByValue(Comparator.reverseOrder()))
@@ -259,15 +264,28 @@ public class RetrievalService {
             }
             out.putIfAbsent(c.chunkId(), c);
         }
-        return out.values().stream().limit(limit).toList();
+        // 选出来之后要重排：占位顺序是"先到先得"，不代表谁更相关。
+        // 融合分相同的两条（各在一个通道里排第一、另一个通道里排第二）
+        // 就比它在各自通道里拿到的原始相关度——原始分高说明这条是它那一路的强命中。
+        // 这一步直接决定降级时"原文摘录"先给学生看哪一条。
+        return out.values().stream()
+                .limit(limit)
+                .sorted(Comparator
+                        .comparingDouble((RetrievedChunk c) -> score.getOrDefault(c.chunkId(), 0.0))
+                        .reversed()
+                        .thenComparing(Comparator.comparingDouble(
+                                (RetrievedChunk c) -> bestRaw.getOrDefault(c.chunkId(), 0.0)).reversed()))
+                .toList();
     }
 
     private void accumulate(List<RetrievedChunk> list, Map<Long, Double> score,
+                            Map<Long, Double> bestRaw,
                             Map<Long, RetrievedChunk> byId) {
         for (int i = 0; i < list.size(); i++) {
             RetrievedChunk c = list.get(i);
             byId.putIfAbsent(c.chunkId(), c);
             score.merge(c.chunkId(), 1.0 / (RRF_K + i + 1), Double::sum);
+            bestRaw.merge(c.chunkId(), c.rawScore(), Math::max);
         }
     }
 

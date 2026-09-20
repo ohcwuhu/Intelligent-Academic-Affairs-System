@@ -95,10 +95,10 @@ npm run dev        # http://127.0.0.1:5173，/api 由 Vite 代理到 8080
 cd backend;  mvn test                    # 29 条单元测试
 cd frontend; npm run build               # 类型检查 + 打包
 node scripts/verify.mjs                  # 39 项浏览器验收（需要前后端都起着）
-node scripts/eval-assistant.mjs          # 26 条问答评测
+node scripts/eval-assistant.mjs          # 27 条问答评测
 ```
 
-最近一次结果：单测 29/29、浏览器验收 39/39、问答评测 26/26（p50 848ms，p95 1640ms）。
+最近一次结果：单测 29/29、浏览器验收 39/39、问答评测 27/27（p50 721ms，p95 1136ms）。
 截图与明细在 `.impeccable/review/`，评测明细在 `eval/report.json`。
 
 ## 文档
