@@ -493,6 +493,74 @@ await check('知识库页有门禁、切片校验与到期提醒', async () => {
   return gate.replace(/\s+/g, ' ').slice(0, 70)
 })
 
+await check('文档失效后不再被检索，重建索引后恢复', async () => {
+  const call = (fn) => page.evaluate(fn)
+  const docs = await call(async () => {
+    const token = localStorage.getItem('iaas.token')
+    const res = await fetch('/api/knowledge/documents', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return (await res.json()).data
+  })
+  assert(docs.length, '知识库里没有文档')
+  const docId = docs[0].id
+
+  // 注意：page.evaluate 里的函数在浏览器里跑，拿不到 Node 这边的变量，
+  // 需要的数据要通过第二个参数传进去
+  const expired = await page.evaluate(async (id) => {
+    const token = localStorage.getItem('iaas.token')
+    const reason = encodeURIComponent('验收：验证失效后不再参与检索')
+    const res = await fetch(`/api/knowledge/documents/${id}/expire?reason=${reason}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return res.json()
+  }, docId)
+  assert(expired.code === 0, `标记失效失败：${JSON.stringify(expired).slice(0, 120)}`)
+
+  const askOnce = async () =>
+    call(async () => {
+      const token = localStorage.getItem('iaas.token')
+      const res = await fetch('/api/assistant/ask', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: '重修需要什么条件？' }),
+      })
+      return (await res.json()).data
+    })
+
+  const afterExpire = await askOnce()
+  assert(afterExpire.mode === 'refusal', `失效后还在拿这份文档作答：mode=${afterExpire.mode}`)
+
+  const again = await call(async () => {
+    const token = localStorage.getItem('iaas.token')
+    const res = await fetch('/api/knowledge/reingest', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return res.json()
+  })
+  assert(again.code === 0, `重建索引失败：${JSON.stringify(again).slice(0, 120)}`)
+  assert(again.data > 100, `重建后的切片数不对：${again.data}`)
+
+  const afterRebuild = await askOnce()
+  assert(
+    afterRebuild.mode !== 'refusal' && afterRebuild.citations.length > 0,
+    `重建后仍然答不出来：mode=${afterRebuild.mode} 引用${afterRebuild.citations.length}条`,
+  )
+
+  const audit = await call(async () => {
+    const token = localStorage.getItem('iaas.token')
+    const res = await fetch('/api/governance/audit?page=1&size=50', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return (await res.json()).data
+  })
+  const logged = (audit.records ?? []).some((r) => (r.reason ?? '').includes('重建索引'))
+  assert(logged, '审计里没有留下重建索引的理由')
+  return `失效后拒答，重建 ${again.data} 片后恢复（${afterRebuild.mode}），理由已进审计`
+})
+
 await check('有选课记录的学生删不掉', async () => {
   const r = await page.evaluate(async () => {
     const token = localStorage.getItem('iaas.token')
@@ -599,10 +667,25 @@ await check('撤销录入后回到未录入', async () => {
 })
 
 await check('学生反馈能在治理台被处理', async () => {
-  // 同一用户对同一问题的反馈只收一条（防重复刷），所以每次验收换一个问题，
-  // 免得第二次跑的时候被"已经提交过"挡住。
-  const pool = ['转专业有什么条件', '休学需要什么条件', '补考没过怎么办', '免修怎么申请']
-  const fbQuestion = pool[new Date().getDate() % pool.length]
+  // 同一用户对同一问题的反馈只收一条（防重复刷），所以按分钟轮换问题，
+  // 免得连着跑几次都被"已经提交过"挡住、退回只看处理痕迹那条分支。
+  const pool = [
+    '转专业有什么条件',
+    '休学需要什么条件',
+    '补考没过怎么办',
+    '免修怎么申请',
+    '缓考能申请几门',
+    '重修要交钱吗',
+    '结业之后能换发毕业证吗',
+    '考试作弊怎么处理',
+    '对成绩有疑义怎么查',
+    '想提前毕业要提前多久申请',
+    '学业预警是什么意思',
+    '免听怎么申请',
+  ]
+  const now = new Date()
+  const slot = Math.floor(now.getTime() / 60000)
+  const fbQuestion = pool[slot % pool.length]
   await logout(page)
   await login(page, '2022001')
   await page.goto(`${BASE}/#/assistant`, { waitUntil: 'domcontentloaded' })

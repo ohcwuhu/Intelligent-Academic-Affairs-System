@@ -68,7 +68,18 @@ public class KnowledgeController {
         if (!UserContext.require().isStaff()) {
             throw BizException.forbidden("仅教务人员可重建知识库索引");
         }
-        return R.ok(ingestService.ingestFromConfiguredPath());
+        int n = ingestService.ingestFromConfiguredPath();
+        Long docId = ingestService.lastIngestedDocumentId();
+        // 灌入是"先删旧文档、再建草稿"，不接着发布的话，
+        // 一次重建就让知识库里一份生效依据都不剩，问答整体变成拒答。
+        // 这个坑实测踩过：重建后 stats 的 documents 从 1 变 0，问什么都是"没有相关条款"。
+        // 同一份语料重新解析，风险与上一版相同，所以沿用生效状态；
+        // 理由进审计，谁在什么时候重建、依据什么，都留痕。
+        if (docId != null) {
+            governanceService.publishAsSystem(docId, true,
+                    "重建索引：与上一版同一份语料，沿用原生效状态");
+        }
+        return R.ok(n);
     }
 
     /** 知识库概览。 */
