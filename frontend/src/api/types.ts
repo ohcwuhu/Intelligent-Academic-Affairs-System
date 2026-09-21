@@ -269,6 +269,33 @@ export interface AssistantAnswer {
   durationMs: number
 }
 
+export interface ClassroomOccupancy {
+  classroom: string
+  weekday: number
+  weekdayText: string
+  startSection: number
+  endSection: number
+  sectionText: string
+  courseName: string | null
+  courseCode: string | null
+  teachingClassCode: string
+  teacherName: string | null
+  startWeek: number | null
+  endWeek: number | null
+  weekType: string
+}
+
+export interface ClassroomSlot {
+  termId: number | null
+  termName: string | null
+  weekday: number
+  weekdayText: string
+  startSection: number
+  endSection: number
+  busy: ClassroomOccupancy[]
+  freeRooms: string[]
+}
+
 export interface ProgramRow {
   id: number
   title: string

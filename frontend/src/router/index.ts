@@ -45,6 +45,17 @@ export const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/classrooms',
+    name: 'classrooms',
+    component: () => import('@/views/ClassroomsView.vue'),
+    meta: {
+      title: '教室使用情况',
+      nav: true,
+      group: '学业',
+      roles: ['STUDENT', 'TEACHER', 'ACADEMIC', 'ADMIN'],
+    },
+  },
+  {
     path: '/me/grades',
     name: 'my-grades',
     component: () => import('@/views/GradesView.vue'),

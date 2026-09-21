@@ -41,6 +41,12 @@ public class StudentApplication {
     private LocalDateTime reviewedAt;
     /** 系统在提交时自动判定的结论，供审批人参考 */
     private String precheckNote;
+    /** 教室借用专用：可比较的时段字段 */
+    private String roomName;
+    private Integer roomWeekday;
+    private Integer roomStartSection;
+    private Integer roomEndSection;
+    private String roomWeeks;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

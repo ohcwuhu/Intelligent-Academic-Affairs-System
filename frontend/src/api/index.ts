@@ -22,6 +22,8 @@ import type {
   ProgramAudit,
   ProgramDetail,
   ProgramRow,
+  ClassroomOccupancy,
+  ClassroomSlot,
   GovernanceOverview,
   KnowledgeChunkDetail,
   KnowledgeDocumentRow,
@@ -121,6 +123,14 @@ export const userApi = {
   setStatus: (id: number, status: number) => post<void>(`/user/${id}/status`, {}, { status }),
 }
 
+export const classroomApi = {
+  /** 某学期全部占用（按教室、星期、节次排好序） */
+  usage: (termId?: number) => get<ClassroomOccupancy[]>('/classroom/usage', { termId }),
+  /** 某个时段的占用与空闲教室 */
+  slot: (params: { termId?: number; weekday: number; startSection: number; endSection: number }) =>
+    get<ClassroomSlot>('/classroom/slot', params),
+}
+
 export const programApi = {
   list: () => get<ProgramRow[]>('/program'),
   detail: (id: number) => get<ProgramDetail>(`/program/${id}`),
@@ -167,6 +177,11 @@ export const applicationApi = {
     target?: string
     reason: string
     materials?: string
+    roomName?: string | null
+    roomWeekday?: number | null
+    roomStartSection?: number | null
+    roomEndSection?: number | null
+    roomWeeks?: string | null
   }) => post<ApplicationSubmitResult>('/application', body),
   mine: () => get<ApplicationRow[]>('/application/mine'),
   withdraw: (id: number) => post<void>(`/application/${id}/withdraw`),

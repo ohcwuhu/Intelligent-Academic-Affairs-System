@@ -95,7 +95,7 @@ public class ApplicationService {
     /** 对象是文本而不是系统记录的事项。 */
     private static final java.util.Set<String> TEXT_TARGET_TYPES = java.util.Set.of(
             TYPE_CERTIFICATE, TYPE_ENGLISH_SUB, TYPE_INNOVATION, TYPE_VETERAN,
-            TYPE_BANK_ACCOUNT, TYPE_MAJOR_DIRECTION, TYPE_CLASSROOM);
+            TYPE_BANK_ACCOUNT, TYPE_MAJOR_DIRECTION);
 
     private static final String PENDING = "待审";
     private static final String APPROVED = "已通过";
@@ -196,8 +196,17 @@ public class ApplicationService {
                     default -> "请写明借用的教室与时段";
                 });
             }
-        } else if (req.targetId() == null) {
+        } else if (!TYPE_CLASSROOM.equals(type) && req.targetId() == null) {
             throw new BizException("请选择要申请的对象");
+        }
+        // 教室借用的对象由时段拼出来，学生不用自己写一遍
+        if (TYPE_CLASSROOM.equals(type) && target.isBlank()) {
+            target = "%s %s 第%d-%d节 %s".formatted(
+                    req.roomName() == null ? "" : req.roomName(),
+                    weekdayText(req.roomWeekday()),
+                    req.roomStartSection() == null ? 0 : req.roomStartSection(),
+                    req.roomEndSection() == null ? 0 : req.roomEndSection(),
+                    req.roomWeeks() == null ? "" : req.roomWeeks()).trim();
         }
         if (MATERIAL_REQUIRED.containsKey(type)
                 && (req.materials() == null || req.materials().isBlank())) {
@@ -205,7 +214,7 @@ public class ApplicationService {
         }
 
         Long termId = enrollmentService.currentTermId();
-        String precheck = precheck(type, studentId, termId, req.targetId());
+        String precheck = precheck(type, studentId, termId, req);
 
         // 同一件事重复提交会变成两张单子压在教务处手里，先拦住
         Long dup = mapper.selectCount(Wrappers.<StudentApplication>lambdaQuery()
@@ -226,6 +235,11 @@ public class ApplicationService {
         a.setTarget(target.isBlank() ? TYPE_TEXT.get(type) : target);
         a.setReason(reason);
         a.setMaterials(req.materials() == null ? "" : req.materials().strip());
+        a.setRoomName(req.roomName());
+        a.setRoomWeekday(req.roomWeekday());
+        a.setRoomStartSection(req.roomStartSection());
+        a.setRoomEndSection(req.roomEndSection());
+        a.setRoomWeeks(req.roomWeeks());
         a.setStatus(PENDING);
         a.setPrecheckNote(precheck);
         a.setCreatedAt(LocalDateTime.now());
@@ -316,7 +330,8 @@ public class ApplicationService {
     // 预检：系统能判准的先判，判不了的留给审批人
     // ------------------------------------------------------------------
 
-    private String precheck(String type, Long studentId, Long termId, Long targetId) {
+    private String precheck(String type, Long studentId, Long termId, ApplicationDtos.SubmitRequest req) {
+        Long targetId = req.targetId();
         List<String> notes = new ArrayList<>();
         switch (type) {
             case TYPE_MAKEUP -> {
@@ -342,7 +357,33 @@ public class ApplicationService {
             case TYPE_BANK_ACCOUNT -> notes.add("账号变更直接影响退费与补助发放，提交后由财务与教务处各核一次");
             case TYPE_MAJOR_DIRECTION -> notes.add("专业方向在培养方案里是二选一，一经确定不再随意变更");
             case TYPE_MINOR -> notes.add("辅修按第二专业培养计划执行，需满足开课人数要求");
-            case TYPE_CLASSROOM -> notes.add("教室借用需写明用途与使用时段，冲突由教务处协调");
+            case TYPE_CLASSROOM -> {
+                if (req.roomName() == null || req.roomName().isBlank() || req.roomWeekday() == null
+                        || req.roomStartSection() == null || req.roomEndSection() == null) {
+                    throw new BizException("请选择教室与使用时段（星期、节次）");
+                }
+                if (req.roomStartSection() > req.roomEndSection()) {
+                    throw new BizException("起始节次不能大于结束节次");
+                }
+                // 教室借用的预检是真正有用的一条：这个时段这间教室是否已经被排课占了
+                List<TeachingClass> busy = teachingClassMapper.selectList(
+                        Wrappers.<TeachingClass>lambdaQuery()
+                                .eq(TeachingClass::getTermId, termId)
+                                .eq(TeachingClass::getClassroom, req.roomName())
+                                .eq(TeachingClass::getWeekday, req.roomWeekday())
+                                .ne(TeachingClass::getStatus, "停开"));
+                for (TeachingClass tc : busy) {
+                    boolean overlap = tc.getStartSection() <= req.roomEndSection()
+                            && req.roomStartSection() <= tc.getEndSection();
+                    if (overlap) {
+                        Course c = courseMapper.selectById(tc.getCourseId());
+                        throw new BizException("该时段这间教室已被占用："
+                                + (c == null ? tc.getCode() : c.getName()) + "（" + tc.getCode() + "，"
+                                + TimeConflictChecker.describe(tc) + "）。请换时段或换教室。");
+                    }
+                }
+                notes.add("该时段这间教室当前没有排课占用，提交后由教务处确认");
+            }
             case TYPE_ON_EXEMPT -> {
                 // 必须"这门课"就在冲突里，而不是"本学期有别的冲突"：
                 // 免听/间听是针对具体课程的申请，拿一门不冲突的课来申请站不住脚
@@ -411,6 +452,11 @@ public class ApplicationService {
                 .anyMatch(f -> Objects.equals(f.getCourseId(), courseId));
     }
 
+    private static String weekdayText(Integer weekday) {
+        String[] names = {"", "周一", "周二", "周三", "周四", "周五", "周六", "周日"};
+        return weekday != null && weekday >= 1 && weekday <= 7 ? names[weekday] : "时间待定";
+    }
+
     /** 当前教学周。学期日期没配好时返回 null，不阻断流程。 */
     private Integer teachingWeek(Long termId) {
         Term term = termMapper.selectById(termId);
@@ -447,6 +493,8 @@ public class ApplicationService {
                             s == null ? null : s.getName(),
                             a.getTermId(), t == null ? null : t.getName(),
                             a.getTarget(), a.getReason(), a.getMaterials(),
+                            a.getRoomName(), a.getRoomWeekday(), a.getRoomStartSection(),
+                            a.getRoomEndSection(), a.getRoomWeeks(),
                             a.getPrecheckNote(), a.getReviewer(), a.getReviewNote(),
                             fmt(a.getReviewedAt()), fmt(a.getCreatedAt()));
                 })

@@ -211,6 +211,13 @@ CREATE TABLE student_application (
     review_note   VARCHAR(500) NULL,
     reviewed_at   DATETIME     NULL,
     precheck_note VARCHAR(500) NULL COMMENT '系统提交时自动判定的结论，供审批人参考',
+    -- 教室借用专用：借用申请要能判"这个时段这间教室是否被占"，
+    -- 只存一段描述文本是判不了的，所以把时段拆成可比较的列
+    room_name     VARCHAR(50)  NULL,
+    room_weekday  TINYINT      NULL,
+    room_start_section TINYINT NULL,
+    room_end_section   TINYINT NULL,
+    room_weeks    VARCHAR(40)  NULL COMMENT '周次描述，如 1-16周 / 单周',
     created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),

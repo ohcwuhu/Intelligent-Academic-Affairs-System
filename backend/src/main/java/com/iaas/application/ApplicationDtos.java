@@ -7,7 +7,9 @@ public final class ApplicationDtos {
 
     /** 提交申请。targetId 与 target 按类型解释：重修是课程，转专业是专业，免听间听是教学班。 */
     public record SubmitRequest(
-            String type, Long targetId, String target, String reason, String materials) {
+            String type, Long targetId, String target, String reason, String materials,
+            String roomName, Integer roomWeekday, Integer roomStartSection,
+            Integer roomEndSection, String roomWeeks) {
     }
 
     public record Row(
@@ -15,6 +17,8 @@ public final class ApplicationDtos {
             String studentNo, String studentName,
             Long termId, String termName,
             String target, String reason, String materials,
+            String roomName, Integer roomWeekday, Integer roomStartSection,
+            Integer roomEndSection, String roomWeeks,
             String precheckNote, String reviewer, String reviewNote,
             String reviewedAt, String createdAt) {
     }

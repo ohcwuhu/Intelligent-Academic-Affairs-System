@@ -9,8 +9,8 @@
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import { ApiError } from '@/api/client'
-import { applicationApi } from '@/api'
-import type { ApplicationOption, ApplicationRow } from '@/api/types'
+import { applicationApi, classroomApi } from '@/api'
+import type { ApplicationOption, ApplicationRow, ClassroomSlot } from '@/api/types'
 import { toast } from '@/components/useToast'
 import Plate from '@/components/Plate.vue'
 import Btn from '@/components/Btn.vue'
@@ -29,6 +29,21 @@ const submitting = ref(false)
 const lastPrecheck = ref('')
 
 const form = ref({ type: '', targetId: null as number | null, target: '', reason: '', materials: '' })
+
+// 教室借用要判"这个时段这间教室是否被占"，所以单独收结构化时段
+const room = ref({ name: '', weekday: 1, startSection: 1, endSection: 2, weeks: '1-16周' })
+const slot = ref<ClassroomSlot | null>(null)
+const WEEKDAYS = [
+  { value: 1, text: '周一' },
+  { value: 2, text: '周二' },
+  { value: 3, text: '周三' },
+  { value: 4, text: '周四' },
+  { value: 5, text: '周五' },
+  { value: 6, text: '周六' },
+  { value: 7, text: '周日' },
+]
+const SECTIONS = Array.from({ length: 12 }, (_, i) => i + 1)
+const isClassroom = computed(() => form.value.type === 'CLASSROOM')
 
 /** 对象是文本的事项（证明名称、替换方式、银行账号、教室时段…），与后端的口径一致 */
 const TEXT_TARGET_TYPES = [
@@ -94,6 +109,28 @@ async function loadOptions() {
 
 watch(() => form.value.type, loadOptions)
 
+/** 选好时段就查出这个时段的占用与空闲，借用时直接挑空教室。 */
+async function loadSlot() {
+  if (!isClassroom.value) return
+  try {
+    slot.value = await classroomApi.slot({
+      weekday: room.value.weekday,
+      startSection: room.value.startSection,
+      endSection: room.value.endSection,
+    })
+    if (!slot.value.freeRooms.includes(room.value.name)) {
+      room.value.name = slot.value.freeRooms[0] ?? ''
+    }
+  } catch {
+    slot.value = null
+  }
+}
+watch(
+  () => [room.value.weekday, room.value.startSection, room.value.endSection],
+  loadSlot,
+)
+watch(isClassroom, loadSlot)
+
 async function submit() {
   if (form.value.reason.trim().length < 5) {
     toast('申请理由至少写 5 个字，教务处要据此判断', 'bad')
@@ -106,9 +143,18 @@ async function submit() {
     const res = await applicationApi.submit({
       type: form.value.type,
       targetId: needsTarget.value ? form.value.targetId : null,
-      target: needsTarget.value ? (chosen?.label ?? '') : form.value.target,
+      target: needsTarget.value
+        ? (chosen?.label ?? '')
+        : isClassroom.value
+          ? `${room.value.name} ${WEEKDAYS.find((d) => d.value === room.value.weekday)?.text} 第${room.value.startSection}-${room.value.endSection}节 ${room.value.weeks}`
+          : form.value.target,
       reason: form.value.reason,
       materials: form.value.materials,
+      roomName: isClassroom.value ? room.value.name : null,
+      roomWeekday: isClassroom.value ? room.value.weekday : null,
+      roomStartSection: isClassroom.value ? room.value.startSection : null,
+      roomEndSection: isClassroom.value ? room.value.endSection : null,
+      roomWeeks: isClassroom.value ? room.value.weeks : null,
     })
     lastPrecheck.value = res.precheckNote ?? ''
     toast(`${res.message}${res.precheckNote ? '；' + res.precheckNote : ''}`, 'ok', 8000)
@@ -164,6 +210,30 @@ async function withdraw(row: ApplicationRow) {
       <FieldRow label="申请理由" for-id="reason" hint="写清为什么办、办了要解决什么问题">
         <textarea id="reason" v-model="form.reason" rows="3" maxlength="500" />
       </FieldRow>
+
+      <template v-if="isClassroom">
+        <FieldRow label="星期" for-id="rwd">
+          <select id="rwd" v-model.number="room.weekday">
+            <option v-for="d in WEEKDAYS" :key="d.value" :value="d.value">{{ d.text }}</option>
+          </select>
+        </FieldRow>
+        <FieldRow label="起始节 / 结束节" for-id="rsec">
+          <select id="rsec" v-model.number="room.startSection" class="inline">
+            <option v-for="s in SECTIONS" :key="s" :value="s">{{ s }}</option>
+          </select>
+          <select v-model.number="room.endSection" class="inline">
+            <option v-for="s in SECTIONS" :key="s" :value="s">{{ s }}</option>
+          </select>
+        </FieldRow>
+        <FieldRow label="教室" for-id="rroom" :hint="slot ? `该时段空闲 ${slot.freeRooms.length} 间，已占用的不出现在列表里` : '先选时段'">
+          <select id="rroom" v-model="room.name">
+            <option v-for="r in slot?.freeRooms ?? []" :key="r" :value="r">{{ r }}</option>
+          </select>
+        </FieldRow>
+        <FieldRow label="周次" for-id="rweeks">
+          <input id="rweeks" v-model="room.weeks" placeholder="1-16周 / 单周" />
+        </FieldRow>
+      </template>
 
       <FieldRow
         label="材料说明"
