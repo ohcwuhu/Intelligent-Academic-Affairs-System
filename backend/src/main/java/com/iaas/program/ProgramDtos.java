@@ -23,7 +23,7 @@ public final class ProgramDtos {
             Long id, String module, String groupName, String courseName, String courseType,
             String assessType, BigDecimal credit, Integer totalHours, Integer labHours,
             Integer computerHours, Integer termNo, Integer weekHours, String note,
-            String required, Long courseId) {
+            String required, Long courseId, String courseCode) {
     }
 
     public record Detail(ProgramRow program, List<ModuleRow> modules, List<CourseRow> courses) {

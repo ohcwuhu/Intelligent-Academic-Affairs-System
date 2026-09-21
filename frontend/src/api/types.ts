@@ -309,6 +309,7 @@ export interface ProgramCourseRow {
   note: string | null
   required: string | null
   courseId: number | null
+  courseCode: string | null
 }
 
 export interface ProgramDetail {

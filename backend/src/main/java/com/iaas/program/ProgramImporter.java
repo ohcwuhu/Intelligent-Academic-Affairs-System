@@ -14,6 +14,8 @@ import com.iaas.program.mapper.ProgramCourseMapper;
 import com.iaas.program.mapper.ProgramMapper;
 import com.iaas.program.mapper.ProgramModuleMapper;
 import com.iaas.system.entity.Major;
+import com.iaas.system.entity.College;
+import com.iaas.system.mapper.CollegeMapper;
 import com.iaas.system.mapper.MajorMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -63,8 +65,13 @@ public class ProgramImporter {
     private final ProgramModuleMapper moduleMapper;
     private final ProgramCourseMapper courseMapper;
     private final MajorMapper majorMapper;
+    private final CollegeMapper collegeMapper;
     private final CourseMapper libraryCourseMapper;
     private final AuditService auditService;
+
+    /** 课程库对齐结果：复用已有课程多少门、新建多少门、新编号从哪开始。 */
+    private record LibrarySync(int reused, int created) {
+    }
 
     /** 解析结果：一个方案 + 若干模块与课程 + 报告行。 */
     private record Parsed(Program program, List<ProgramModule> modules,
@@ -84,18 +91,31 @@ public class ProgramImporter {
     /** 按字节导入，供启动时的自动导入复用。 */
     public ImportDtos.Report importBytes(String fileName, byte[] bytes, boolean commit) {
         Parsed parsed = parse(fileName, bytes);
-        long failed = parsed.rows().stream().filter(r -> !r.ok()).count();
         boolean committed = false;
+        LibrarySync sync = null;
+        List<ProgramCourse> all = parsed.coursesByModule().values().stream()
+                .flatMap(List::stream).toList();
         if (commit) {
             if (!parsed.errors().isEmpty()) {
                 return report(fileName, parsed, false);
             }
+            sync = syncCourseLibrary(all, parsed.program().getMajorName(), true);
             save(parsed);
             committed = true;
             auditService.ingest("导入培养方案：" + parsed.program().getTitle()
                     + "，模块 " + parsed.modules().size()
-                    + " 个，计划课程 " + parsed.coursesByModule().values().stream()
-                    .mapToInt(List::size).sum() + " 门", 0);
+                    + " 个，计划课程 " + all.size() + " 门；课程库复用 " + sync.reused()
+                    + " 门、新建 " + sync.created() + " 门", sync.created());
+        } else {
+            // 预览也要给出"会新建多少门课"，否则教务点提交前不知道会动课程库
+            sync = syncCourseLibrary(all, parsed.program().getMajorName(), false);
+        }
+        if (sync != null) {
+            parsed.rows().add(new ImportDtos.RowResult(0, "课程库",
+                    true, (committed ? "已" : "将") + "复用课程库 " + sync.reused() + " 门，"
+                            + (committed ? "新建 " : "需新建 ") + sync.created() + " 门"
+                            + (sync.created() > 0
+                                    ? "（方案里没有课程代码，新建课程由系统编号 PLxxxxx）" : "")));
         }
         return report(fileName, parsed, committed);
     }
@@ -134,7 +154,6 @@ public class ProgramImporter {
         readOverview(overview, program, modules, requiredByCategory, errors);
 
         Map<String, List<ProgramCourse>> byModule = new LinkedHashMap<>();
-        Map<String, Course> library = libraryByName();
         int line = 1;
         // 总览也占一行：把"学分结构里有哪几个模块、哪些模块没有课程表"交代清楚，
         // 教务看报告时不用自己拿两份东西对照
@@ -188,10 +207,9 @@ public class ProgramImporter {
                     message += "（不在毕业要求结构表里，如辅修模块，仅供参考）";
                 }
                 for (ProgramCourse c : courses) {
-                    Course hit = library.get(ProgramService.normalize(c.getCourseName()));
-                    if (hit != null) {
-                        c.setCourseId(hit.getId());
-                    }
+                    // 与课程库的对齐放到落库时做：预览阶段不能写库，
+                    // 预览里报出来的"新建多少门"必须与提交后的实际结果一致，
+                    // 所以两边都跑同一个匹配函数（见 syncCourseLibrary）
                 }
                 byModule.put(sheet.name(), courses);
                 rows.add(new ImportDtos.RowResult(line, sheet.name(), true, message));
@@ -453,11 +471,104 @@ public class ProgramImporter {
         }
     }
 
-    /** 课程库按归一化名称索引，用于把计划课程与课程库对上。 */
-    private Map<String, Course> libraryByName() {
-        return libraryCourseMapper.selectList(null).stream()
-                .collect(Collectors.toMap(c -> ProgramService.normalize(c.getName()),
-                        Function.identity(), (a, b) -> a));
+    /**
+     * 把计划课程对齐到课程库：能对上的复用，对不上的建一门。
+     *
+     * <p>为什么导入培养方案要顺带建课程：培养方案是课程库的上游——
+     * 学校的课程本来就是按培养计划开的。方案里没有课程代码（这批文件里确实没有），
+     * 所以新建的课由系统编号（PL + 5 位流水号），并在报告里说明，
+     * 将来学校给了正式代码，在课程库里改掉即可。
+     *
+     * <p>匹配规则与毕业审核一致：先归一化精确匹配，再退一步唯一包含匹配，
+     * 这样"算法与数据结构"会复用已有的"数据结构"，而不是多出一门重复的课。
+     */
+    private LibrarySync syncCourseLibrary(List<ProgramCourse> all, String majorName, boolean commit) {
+        List<Course> existing = libraryCourseMapper.selectList(null);
+        int next = nextPlanSerial(existing);
+        int reused = 0;
+        int created = 0;
+        // 课程库要求归属学院：优先用本专业所属学院，
+        // 拿不到就退回第一个学院——导入不该因为一个展示字段而整份失败
+        Long collegeId = resolveCollegeId(majorName);
+        // 同一次导入里同名课程只建一门（三门专业的方案里有大量公共课）
+        Map<String, Course> createdInThisRun = new LinkedHashMap<>();
+        for (ProgramCourse pc : all) {
+            Course hit = matchCourse(pc.getCourseName(), existing);
+            if (hit == null) {
+                hit = createdInThisRun.get(ProgramService.normalize(pc.getCourseName()));
+            }
+            if (hit != null) {
+                reused++;
+                if (commit) {
+                    pc.setCourseId(hit.getId());
+                }
+                continue;
+            }
+            created++;
+            if (!commit) {
+                // 预览只数不改：用一个占位对象记住这个名字已经算过
+                createdInThisRun.put(ProgramService.normalize(pc.getCourseName()), new Course());
+                continue;
+            }
+            Course c = new Course();
+            // 课程码唯一：PL + 5 位流水号，接着课程库里已有的 PL 号往后排
+            c.setCode("PL%05d".formatted(next++));
+            c.setName(pc.getCourseName());
+            c.setCredit(pc.getCredit());
+            c.setHours(pc.getTotalHours());
+            c.setCourseType(pc.getRequired() == null ? "必修" : pc.getRequired());
+            c.setAssessType(pc.getAssessType());
+            c.setCollegeId(collegeId);
+            c.setStatus(1);
+            libraryCourseMapper.insert(c);
+            createdInThisRun.put(ProgramService.normalize(c.getName()), c);
+            pc.setCourseId(c.getId());
+        }
+        return new LibrarySync(reused, created);
+    }
+
+    /** 本专业所属学院；专业对不上时退回第一个学院。 */
+    private Long resolveCollegeId(String majorName) {
+        Major major = majorMapper.selectOne(Wrappers.<Major>lambdaQuery()
+                .eq(Major::getName, majorName).last("limit 1"));
+        if (major != null && major.getCollegeId() != null) {
+            return major.getCollegeId();
+        }
+        return collegeMapper.selectList(Wrappers.<College>lambdaQuery().last("limit 1"))
+                .stream().findFirst().map(College::getId).orElse(null);
+    }
+
+    /** 课程库里的匹配：精确优先，其次唯一包含。 */
+    private Course matchCourse(String planName, List<Course> existing) {
+        String key = ProgramService.normalize(planName);
+        for (Course c : existing) {
+            if (ProgramService.normalize(c.getName()).equals(key)) {
+                return c;
+            }
+        }
+        List<Course> candidates = existing.stream()
+                .filter(c -> {
+                    String n = ProgramService.normalize(c.getName());
+                    return n.length() >= 4 && (n.contains(key) || key.contains(n));
+                })
+                .toList();
+        return candidates.size() == 1 ? candidates.get(0) : null;
+    }
+
+    /** 系统新编号从 PL000xx 往后接，避免与已有课程撞号。 */
+    private int nextPlanSerial(List<Course> existing) {
+        int max = 0;
+        for (Course c : existing) {
+            String code = c.getCode();
+            if (code != null && code.startsWith("PL") && code.length() > 2) {
+                try {
+                    max = Math.max(max, Integer.parseInt(code.substring(2)));
+                } catch (NumberFormatException ignore) {
+                    // 不是流水号就跳过
+                }
+            }
+        }
+        return max + 1;
     }
 
     // ------------------------------------------------------------------

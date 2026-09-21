@@ -942,6 +942,36 @@ await check('专业课程表按专业筛选', async () => {
 
 // ---------------------------------------------------------------- 批量导入
 // ---------------------------------------------------------------- 培养计划与毕业审核
+await check('培养方案把课程写进课程库，且课程码唯一', async () => {
+  // 方案里没有课程代码，所以系统给新建课程编号（PL + 流水号）；
+  // 能对上已有课程的（如"算法与数据结构"→"数据结构"）复用原编号，不重复建课
+  const result = await page.evaluate(async () => {
+    const token = localStorage.getItem('iaas.token')
+    const res = await fetch('/api/course?page=1&size=300&keyword=PL0', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const body = await res.json()
+    const codes = body.data.records.map((c) => c.code)
+    return { total: body.data.total, distinct: new Set(codes).size }
+  })
+  assert(result.total > 100, `课程库里没有按培养方案新建的课：${result.total}`)
+  assert(result.total === result.distinct, `课程码有重复：${result.total} 门 / ${result.distinct} 个编号`)
+  return `按方案新建 ${result.total} 门课，编号均唯一`
+})
+
+await check('培养方案页显示每门计划课程对齐到的课程码', async () => {
+  await logout(page)
+  await login(page, 'jw001')
+  await gotoHash('/admin/programs')
+  await settleContent(page)
+  const body = await text(page)
+  assert(/课程码/.test(body), '计划课程列表里没有课程码列')
+  assert(/CS102/.test(body), '没有显示"算法与数据结构"对齐到的 CS102')
+  assert(/PL0\d+/.test(body), '没有显示系统新建课程的编号')
+  await shot(page, '27-program-course-codes')
+  return '对齐结果与编号都能看到'
+})
+
 await check('学生能看到培养计划的学分缺口', async () => {
   await logout(page)
   await login(page, '2022001')

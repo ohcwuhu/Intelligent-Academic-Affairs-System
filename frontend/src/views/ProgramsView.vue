@@ -32,6 +32,7 @@ const moduleColumns: Column[] = [
 const courseColumns: Column[] = [
   { key: 'term', label: '学期', width: '70px', align: 'right' },
   { key: 'name', label: '课程名称' },
+  { key: 'code', label: '课程码', width: '100px' },
   { key: 'group', label: '方向/分组', width: '180px' },
   { key: 'assess', label: '考核', width: '70px' },
   { key: 'credit', label: '学分', width: '70px', align: 'right' },
@@ -138,6 +139,10 @@ const shownCourses = computed(() =>
             <tr v-for="c in shownCourses" :key="`${c.module}-${c.courseName}-${c.termNo ?? 0}`">
               <td class="num num-end">{{ c.termNo ?? '—' }}</td>
               <td>{{ c.courseName }}</td>
+              <td>
+                <span v-if="c.courseCode" class="num code">{{ c.courseCode }}</span>
+                <span v-else class="dim">未对齐</span>
+              </td>
               <td class="dim">{{ c.groupName ?? '—' }}</td>
               <td>{{ c.assessType ?? '—' }}</td>
               <td class="num num-end">{{ creditText(c.credit) }}</td>
@@ -226,6 +231,14 @@ const shownCourses = computed(() =>
   padding: var(--s-2) var(--s-4) 0;
   font-size: var(--t-xs);
   color: var(--ink-muted);
+}
+/* 课程码用铭牌样式：它是课程在系统里的唯一标识，值得一眼认出来 */
+.code {
+  display: inline-block;
+  padding: 0 5px;
+  background: var(--structure);
+  color: var(--face);
+  font-size: var(--t-xs);
 }
 .dim {
   color: var(--ink-muted);

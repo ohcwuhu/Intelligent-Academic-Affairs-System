@@ -2,6 +2,8 @@ package com.iaas.program;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.iaas.common.BizException;
+import com.iaas.course.entity.Course;
+import com.iaas.course.mapper.CourseMapper;
 import com.iaas.enrollment.EnrollmentDtos;
 import com.iaas.enrollment.EnrollmentService;
 import com.iaas.program.entity.Program;
@@ -59,6 +61,7 @@ public class ProgramService {
     private final ProgramCourseMapper courseMapper;
     private final StudentMapper studentMapper;
     private final MajorMapper majorMapper;
+    private final CourseMapper courseLibraryMapper;
     private final EnrollmentService enrollmentService;
 
     // ------------------------------------------------------------------
@@ -102,10 +105,21 @@ public class ProgramService {
                         .orderByAsc(ProgramCourse::getModule)
                         .orderByAsc(ProgramCourse::getTermNo)
                         .orderByAsc(ProgramCourse::getId));
+        // 计划课程对齐到的课程码：教务要能一眼看出"这门课对到了哪个编号"
+        Map<Long, Course> matched = fetchCourses(courses.stream()
+                .map(ProgramCourse::getCourseId).filter(Objects::nonNull).distinct().toList());
         return new ProgramDtos.Detail(toRow(p, modules, courses),
                 modules.stream().map(m -> new ProgramDtos.ModuleRow(
                         m.getCategory(), m.getHoursText(), m.getCredit(), m.getRatio())).toList(),
-                courses.stream().map(ProgramService::toCourseRow).toList());
+                courses.stream().map(c -> toCourseRow(c, matched)).toList());
+    }
+
+    private Map<Long, Course> fetchCourses(List<Long> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return courseLibraryMapper.selectBatchIds(ids).stream()
+                .collect(Collectors.toMap(Course::getId, Function.identity(), (x, y) -> x));
     }
 
     /** 某个专业的现行方案：审核用它当基准。 */
@@ -197,7 +211,7 @@ public class ProgramService {
                 .filter(c -> !matchedCourseIds.contains(c.enrollmentId()))
                 .map(c -> new ProgramDtos.CourseRow(null, "方案外", null, c.courseName(), "理论",
                         null, c.credit(), null, null, null, null, null,
-                        c.termName() + " 成绩 " + c.score(), null, null))
+                        c.termName() + " 成绩 " + c.score(), null, null, c.courseCode()))
                 .toList();
 
         long unmatchedPlan = courses.stream()
@@ -267,11 +281,12 @@ public class ProgramService {
                 modules.size(), courses.size(), sum);
     }
 
-    private static ProgramDtos.CourseRow toCourseRow(ProgramCourse c) {
+    private static ProgramDtos.CourseRow toCourseRow(ProgramCourse c, Map<Long, Course> matched) {
+        Course lib = c.getCourseId() == null ? null : matched.get(c.getCourseId());
         return new ProgramDtos.CourseRow(
                 c.getId(), c.getModule(), c.getGroupName(), c.getCourseName(), c.getCourseType(),
                 c.getAssessType(), c.getCredit(), c.getTotalHours(), c.getLabHours(),
                 c.getComputerHours(), c.getTermNo(), c.getWeekHours(), c.getNote(),
-                c.getRequired(), c.getCourseId());
+                c.getRequired(), c.getCourseId(), lib == null ? null : lib.getCode());
     }
 }
