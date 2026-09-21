@@ -97,15 +97,15 @@ async function login(page, username, password = '123456') {
   await page.fill('#password', password)
   await page.click('button[type="submit"]')
   // 点完不能立刻读页面：按钮会先变成"正在核对"，这时候读到的还是登录前的内容。
-  // 等按钮不再是"正在核对"，或者已经离开登录页、或者出现了错误提示，再往下走。
+  // 但要等的是"确定结果"，不是"按钮不忙"——点下去的那一瞬间按钮还没变忙，
+  // 按后者判断会立刻返回，后面所有断言都跑在登录页上。
+  // 成功的确定结果是离开登录页，失败的确定结果是出现错误提示。
   await page
     .waitForFunction(() => {
-      const btn = document.querySelector('form button[type="submit"]')
-      const busy = btn ? /正在核对|登录中/.test(btn.textContent ?? '') : false
-      const alert = document.querySelector('[role="alert"]')
       const left = !location.hash.includes('/login')
-      return left || !!alert || !busy
-    }, null, { timeout: 10000 })
+      const alert = document.querySelector('[role="alert"]')
+      return left || !!alert
+    }, null, { timeout: 15000 })
     .catch(() => {})
   await settle(page)
 }
@@ -633,7 +633,10 @@ await check('教师录成绩能保存', async () => {
   await settleContent(page)
   await assertNoError(page, '名单页')
   const row = page.locator('tr', { hasText: '2022001' }).first()
-  assert(await row.count(), '数据结构班名单里没有 2022001')
+  assert(
+    await row.count(),
+    `数据结构班名单里没有 2022001（当前地址 ${page.url()}，正文：${(await text(page)).replace(/\s+/g, ' ').slice(0, 140)}）`,
+  )
   const input = row.locator('input.score-input')
   // 名单里可能已经留着上一次验收的分数，先看清现状再决定写什么，
   // 否则"填一个和现在一样的值"不会产生改动，保存按钮就是灰的
@@ -655,7 +658,7 @@ await check('学生端立刻看到成绩与自动算出的绩点', async () => {
   await settleContent(page)
   await assertNoError(page, '成绩页')
   const body = await text(page)
-  assert(/数据结构/.test(body), '成绩页没有数据结构这门课')
+  assert(/数据结构/.test(body), `成绩页没有数据结构这门课（${page.url()}）`)
   assert(body.includes(gradeProbe), `成绩页没有刚录的 ${gradeProbe} 分：${body.slice(0, 200)}`)
   await shot(page, '15-student-grades-after-entry')
   return `${gradeProbe} 分与绩点都已同步`
@@ -798,6 +801,112 @@ await check('已有冲突的课表会把冲突提示出来', async () => {
   assert(/数据结构/.test(body) && /计算机网络/.test(body), '课表里没有这两门课')
   await shot(page, '18-student-timetable-conflict')
   return body.match(/选课里有\s*\d+\s*处时间冲突/)?.[0] ?? '冲突提示可见'
+})
+
+// ---------------------------------------------------------------- 办事与审批
+await check('学生提交重修申请，系统当场给出预检结论', async () => {
+  await logout(page)
+  await login(page, '2021002')
+  await page.goto(`${BASE}/#/me/applications`, { waitUntil: 'domcontentloaded' })
+  await settleContent(page)
+  await assertNoError(page, '我的申请页')
+  assert(/我的申请/.test(await text(page)), '我的申请页没渲染')
+
+  await page.selectOption('#type', 'RETAKE')
+  await page.waitForTimeout(900)
+  const option = page.locator('#target option').nth(1)
+  const targetId = await option.getAttribute('value')
+  assert(targetId, '重修申请里没有可申请的对象（应该有以往未通过的课程）')
+  await page.selectOption('#target', targetId)
+  await page.fill('#reason', '以往学期程序设计基础未通过，本学期申请重新修读')
+  await page.click('button:has-text("提交申请")')
+  await page.waitForTimeout(2000)
+  const toast = await page.locator('.toast').last().innerText()
+  assert(/已提交/.test(toast), `提交没有成功：${toast}`)
+  assert(/重新修读|未通过|缴费/.test(toast), `没有给出预检结论：${toast}`)
+  await shot(page, '19-student-application')
+  return toast.replace(/\s+/g, ' ').slice(0, 70)
+})
+
+await check('无冲突的课申请免听会被拦下', async () => {
+  // 李思远本学期没有时间冲突，手册第十九条的免听/间听只用于解决冲突
+  await logout(page)
+  await login(page, '2022001')
+  const r = await page.evaluate(async () => {
+    const token = localStorage.getItem('iaas.token')
+    const res = await fetch('/api/application', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'ON_EXEMPT',
+        targetId: 2,
+        target: '数据结构（CS102）',
+        reason: '不想跟班听课，申请免听数据结构',
+      }),
+    })
+    return res.json()
+  })
+  assert(r.code === 400, `期望被拦下，实际 ${JSON.stringify(r).slice(0, 140)}`)
+  assert(/第十九条/.test(r.message), `拦截理由没引用条款：${r.message}`)
+  return r.message.slice(0, 46)
+})
+
+await check('教务审批：待办排在最前，通过后学生能看到意见', async () => {
+  await logout(page)
+  await login(page, 'jw001')
+  await page.goto(`${BASE}/#/admin/applications`, { waitUntil: 'domcontentloaded' })
+  await settleContent(page)
+  await assertNoError(page, '申请审批页')
+  const first = page.locator('tbody tr').first()
+  assert(await first.count(), '审批列表是空的')
+  const firstText = await first.innerText()
+  assert(/待审/.test(firstText), `第一行不是待审的单子：${firstText.replace(/\s+/g, ' ')}`)
+  await shot(page, '20-application-review')
+
+  page.once('dialog', (d) => d.accept('已核对成绩，同意重修'))
+  await first.locator('button:has-text("通过")').click()
+  await page.waitForTimeout(1800)
+  const toast = await page.locator('.toast').last().innerText()
+  assert(/已通过/.test(toast), `审批没有成功：${toast}`)
+
+  await logout(page)
+  await login(page, '2021002')
+  await page.goto(`${BASE}/#/me/applications`, { waitUntil: 'domcontentloaded' })
+  await settleContent(page)
+  const body = await text(page)
+  assert(
+    /已通过/.test(body),
+    `学生端没有看到审批结果（当前地址 ${page.url()}，正文：${body.replace(/\s+/g, ' ').slice(0, 180)}）`,
+  )
+  assert(/已核对成绩，同意重修/.test(body), '学生端没有看到审批意见')
+  return '待办在最前，通过后学生能看到意见'
+})
+
+await check('申请权限：教师不能审批，学生不能替别人审', async () => {
+  await logout(page)
+  await login(page, 't1001')
+  const teacher = await page.evaluate(async () => {
+    const token = localStorage.getItem('iaas.token')
+    const res = await fetch('/api/application?page=1&size=10', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return res.json()
+  })
+  assert(teacher.code === 403, `教师不该看到申请审批列表：${JSON.stringify(teacher).slice(0, 120)}`)
+
+  await logout(page)
+  await login(page, '2021002')
+  const student = await page.evaluate(async () => {
+    const token = localStorage.getItem('iaas.token')
+    const res = await fetch('/api/application/1/review', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'APPROVE', note: '我自己批准自己' }),
+    })
+    return res.json()
+  })
+  assert(student.code === 403, `学生不该能审批申请：${JSON.stringify(student).slice(0, 120)}`)
+  return '两条越权路径都被拦住'
 })
 
 await check('页面没有未捕获的前端报错', async () => {

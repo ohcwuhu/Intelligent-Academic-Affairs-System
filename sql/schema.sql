@@ -12,6 +12,7 @@ CREATE DATABASE IF NOT EXISTS iaas DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4
 USE iaas;
 
 DROP TABLE IF EXISTS enrollment;
+DROP TABLE IF EXISTS student_application;
 DROP TABLE IF EXISTS teaching_class;
 DROP TABLE IF EXISTS course;
 DROP TABLE IF EXISTS student;
@@ -181,3 +182,31 @@ CREATE TABLE enrollment (
     KEY idx_enroll_term (term_id),
     KEY idx_enroll_tc (teaching_class_id)
 ) ENGINE=InnoDB COMMENT='选课记录（含成绩）';
+
+-- ---------------------------------------------------------------------
+-- 6. 学生申请单（办事与审批）
+--
+-- 免听间听、重修、转专业、证明打印在教务处是同一件事：
+-- 学生按规则提交、教务按规则审批、过程留痕，所以用一张表按 type 区分，
+-- 而不是每种事项各建一张只有几列的表。
+-- ---------------------------------------------------------------------
+CREATE TABLE student_application (
+    id            BIGINT       NOT NULL AUTO_INCREMENT,
+    type          VARCHAR(30)  NOT NULL COMMENT 'ON_EXEMPT/RETAKE/TRANSFER_MAJOR/CERTIFICATE',
+    student_id    BIGINT       NOT NULL,
+    term_id       BIGINT       NULL,
+    target        VARCHAR(200) NULL COMMENT '事项指向的对象名称',
+    target_id     BIGINT       NULL COMMENT '对象 ID：重修是课程，转专业是专业，免听间听是教学班',
+    reason        VARCHAR(500) NOT NULL,
+    materials     VARCHAR(500) NULL COMMENT '学生自述携带的材料',
+    status        VARCHAR(20)  NOT NULL DEFAULT '待审' COMMENT '待审/已通过/已驳回/已撤回',
+    reviewer      VARCHAR(50)  NULL,
+    review_note   VARCHAR(500) NULL,
+    reviewed_at   DATETIME     NULL,
+    precheck_note VARCHAR(500) NULL COMMENT '系统提交时自动判定的结论，供审批人参考',
+    created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_app_student (student_id, created_at),
+    KEY idx_app_status (status, created_at)
+) ENGINE=InnoDB COMMENT='学生申请单与审批';

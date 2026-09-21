@@ -1,6 +1,9 @@
 import { del, get, post } from './client'
 import type {
   AppUser,
+  ApplicationOption,
+  ApplicationRow,
+  ApplicationSubmitResult,
   AssistantAnswer,
   AssistantStatus,
   AuditRow,
@@ -103,6 +106,24 @@ export const userApi = {
   resetPassword: (id: number, password: string) =>
     post<void>(`/user/${id}/password`, { password }),
   setStatus: (id: number, status: number) => post<void>(`/user/${id}/status`, {}, { status }),
+}
+
+export const applicationApi = {
+  /** 类型清单返回 "编码|名称"，前端拆开当选项用 */
+  types: () => get<string[]>('/application/types'),
+  options: (type: string) => get<ApplicationOption[]>('/application/options', { type }),
+  submit: (body: {
+    type: string
+    targetId?: number | null
+    target?: string
+    reason: string
+    materials?: string
+  }) => post<ApplicationSubmitResult>('/application', body),
+  mine: () => get<ApplicationRow[]>('/application/mine'),
+  withdraw: (id: number) => post<void>(`/application/${id}/withdraw`),
+  page: (params: Record<string, unknown>) => get<PageResult<ApplicationRow>>('/application', params),
+  review: (id: number, action: 'APPROVE' | 'REJECT', note?: string) =>
+    post<ApplicationRow>(`/application/${id}/review`, { action, note }),
 }
 
 export const assistantApi = {

@@ -136,7 +136,10 @@ INSERT INTO enrollment (student_id, teaching_class_id, term_id, status, score, s
  (7, 9, 4,'SELECTED',NULL,'未录入',NULL,'2026-09-02 11:00:00'),
  (8,10, 4,'SELECTED',NULL,'未录入',NULL,'2026-09-02 11:10:00'),
  -- 18 号班只放一个名额且已被占满，用来演示"名额已满"的封条与接口拦截
- (3,18, 4,'SELECTED',NULL,'未录入',NULL,'2026-09-02 11:20:00');
+ (3,18, 4,'SELECTED',NULL,'未录入',NULL,'2026-09-02 11:20:00'),
+ -- 林晓彤（学生 2）在 2024-2025-1 的 CS101 是 52 分且没有重修过：
+ -- 有它，"重新修读申请"才有可申请的对象（预检要求确实存在未通过的记录）
+ (2,12, 1,'SELECTED',52.0,'已录入',0.00,'2024-09-03 09:10:00');
 
 INSERT INTO sys_user (username, password, real_name, role, ref_id, status) VALUES
  ('admin',  @PWD,'系统管理员','ADMIN',   NULL,1),
@@ -157,3 +160,33 @@ INSERT INTO sys_user (username, password, real_name, role, ref_id, status) VALUE
 UPDATE teaching_class tc
 SET enrolled = (SELECT COUNT(*) FROM enrollment e
                 WHERE e.teaching_class_id = tc.id AND e.status = 'SELECTED');
+
+-- ---------------------------------------------------------------------
+-- 申请单样本：三种状态各一条，审批页一进去就有待办可看
+--   免听/间听：陈子豪的课表有真冲突（数据结构与计算机网络同堂），这是它的申请前提
+--   重修：林晓彤的 CS101 未通过，已通过审批
+--   证明打印：李思远的在读证明被驳回，理由是这类证明要现场办
+-- ---------------------------------------------------------------------
+INSERT INTO student_application
+    (type, student_id, term_id, target, target_id, reason, materials, status,
+     reviewer, review_note, reviewed_at, precheck_note, created_at, updated_at)
+VALUES
+    ('ON_EXEMPT', 1, 4, '数据结构（CS102）', 2,
+     '数据结构与计算机网络在同一时段，申请免听数据结构，已与任课教师沟通自学安排',
+     '免听申请表、自学计划各一份', '待审',
+     NULL, NULL, NULL,
+     '本学期存在 1 处时间冲突，符合免听/间听的申请前提；现在是第 3 教学周，手册第十九条要求在开课第一周内提出，需教务处特批',
+     NOW() - INTERVAL 6 HOUR, NOW() - INTERVAL 6 HOUR),
+    ('RETAKE', 2, 4, 'CS101 程序设计基础', 1,
+     '以往学期程序设计基础未通过，本学期申请重新修读，以便按期完成培养计划',
+     '无', '已通过',
+     '王老师', '已核对成绩，同意重修；请按第二十三条按时选课并缴交重修费用',
+     NOW() - INTERVAL 2 DAY,
+     '以往学期有未通过记录，符合重新修读条件',
+     NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 2 DAY),
+    ('CERTIFICATE', 4, 4, '在读证明', NULL,
+     '办理签证需要学校出具在读证明', '护照复印件', '已驳回',
+     '王老师', '在读证明需本人携带学生证到教务部现场办理，线上申请暂不受理',
+     NOW() - INTERVAL 1 DAY,
+     '证明打印为事务性申请，教务处核对后出证',
+     NOW() - INTERVAL 2 DAY, NOW() - INTERVAL 1 DAY);

@@ -46,6 +46,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: '我的档案', nav: true, group: '学业', roles: ['STUDENT'] },
   },
   {
+    path: '/me/applications',
+    name: 'my-applications',
+    component: () => import('@/views/MyApplicationsView.vue'),
+    meta: { title: '我的申请', nav: true, group: '办事', roles: ['STUDENT'] },
+  },
+  {
     path: '/teach/classes',
     name: 'teach-classes',
     component: () => import('@/views/TeachingClassesMine.vue'),
@@ -92,6 +98,12 @@ export const routes: RouteRecordRaw[] = [
     name: 'admin-basic',
     component: () => import('@/views/BasicDataView.vue'),
     meta: { title: '基础数据', nav: true, group: '教务', roles: ['ACADEMIC', 'ADMIN'] },
+  },
+  {
+    path: '/admin/applications',
+    name: 'admin-applications',
+    component: () => import('@/views/ApplicationReviewView.vue'),
+    meta: { title: '申请审批', nav: true, group: '教务', roles: ['ACADEMIC', 'ADMIN'] },
   },
   {
     path: '/admin/knowledge',

@@ -259,6 +259,38 @@ export interface AssistantAnswer {
   durationMs: number
 }
 
+export interface ApplicationRow {
+  id: number
+  type: string
+  typeText: string
+  status: string
+  studentNo: string | null
+  studentName: string | null
+  termId: number | null
+  termName: string | null
+  target: string
+  reason: string
+  materials: string | null
+  precheckNote: string | null
+  reviewer: string | null
+  reviewNote: string | null
+  reviewedAt: string | null
+  createdAt: string | null
+}
+
+export interface ApplicationOption {
+  id: number
+  label: string
+  note: string | null
+}
+
+export interface ApplicationSubmitResult {
+  id: number
+  status: string
+  message: string
+  precheckNote: string | null
+}
+
 export interface ChatConversation {
   id: number
   userId: number

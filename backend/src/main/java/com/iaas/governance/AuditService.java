@@ -57,6 +57,19 @@ public class AuditService {
         save(entry);
     }
 
+    /**
+     * 记录办事类操作（提交申请、审批、撤回）。
+     *
+     * <p>理由拼成一句话写进 reason：谁在什么时候把哪张单子办成了什么，
+     * 出问题时能顺着这条线查回原始单据。
+     */
+    public void workflow(String eventType, String subject, String reason) {
+        AuditLog entry = base(eventType);
+        entry.setQuestion(trim(subject));
+        entry.setReason(trimReason(reason));
+        save(entry);
+    }
+
     private AuditLog base(String eventType) {
         AuditLog e = new AuditLog();
         e.setEventType(eventType);

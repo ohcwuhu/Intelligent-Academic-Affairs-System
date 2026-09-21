@@ -11,9 +11,9 @@
 defineProps<{ value: string }>()
 
 const toneOf = (v: string): string => {
-  if (['开放', '在职', '在读', '启用', '生效'].includes(v)) return 'ok'
-  if (['停开', '休学', '离职', '停用', '待处理'].includes(v)) return 'warn'
-  if (['结课', '退学', '已失效', '无需处理'].includes(v)) return 'off'
+  if (['开放', '在职', '在读', '启用', '生效', '已通过', '已修正', '已补录'].includes(v)) return 'ok'
+  if (['停开', '休学', '离职', '停用', '待处理', '待审'].includes(v)) return 'warn'
+  if (['结课', '退学', '已失效', '无需处理', '已驳回', '已撤回'].includes(v)) return 'off'
   return 'plain'
 }
 </script>

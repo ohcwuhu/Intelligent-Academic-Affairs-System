@@ -181,6 +181,65 @@ public class EnrollmentService {
         return result;
     }
 
+    /**
+     * 这个教学班与该生本学期已选课程是否时间冲突。
+     *
+     * <p>与"本学期有没有冲突"是两回事：免听/间听是针对具体某门课的申请，
+     * 只看整体有冲突，学生会拿一门完全不冲突的课去申请免听。
+     */
+    public boolean hasTimeClash(Long studentId, Long termId, Long teachingClassId) {
+        TeachingClass target = teachingClassMapper.selectById(teachingClassId);
+        if (target == null || DROPPED.equals(target.getStatus())) {
+            throw BizException.notFound("教学班");
+        }
+        List<Enrollment> selected = enrollmentMapper.selectList(
+                Wrappers.<Enrollment>lambdaQuery()
+                        .eq(Enrollment::getStudentId, studentId)
+                        .eq(Enrollment::getTermId, termId)
+                        .eq(Enrollment::getStatus, SELECTED));
+        Map<Long, TeachingClass> tcMap = loadTeachingClasses(
+                selected.stream().map(Enrollment::getTeachingClassId).toList());
+        for (TeachingClass other : tcMap.values()) {
+            if (!Objects.equals(other.getId(), target.getId())
+                    && TimeConflictChecker.conflicts(target, other)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 某门课在本学期的教学班里，是否存在与该生已选课程时间冲突的班。
+     *
+     * <p>用于重修申请的预检：重修课撞课很常见，撞了就要接着走免听/间听，
+     * 这一条写进申请单备注，教务处一眼能看出"这单背后还有一单"。
+     */
+    public boolean hasTimeClashForCourse(Long studentId, Long termId, Long courseId) {
+        List<TeachingClass> targets = teachingClassMapper.selectList(
+                Wrappers.<TeachingClass>lambdaQuery()
+                        .eq(TeachingClass::getTermId, termId)
+                        .eq(TeachingClass::getCourseId, courseId)
+                        .ne(TeachingClass::getStatus, "停开"));
+        if (targets.isEmpty()) {
+            return false;
+        }
+        List<Enrollment> selected = enrollmentMapper.selectList(
+                Wrappers.<Enrollment>lambdaQuery()
+                        .eq(Enrollment::getStudentId, studentId)
+                        .eq(Enrollment::getTermId, termId)
+                        .eq(Enrollment::getStatus, SELECTED));
+        Map<Long, TeachingClass> tcMap = loadTeachingClasses(
+                selected.stream().map(Enrollment::getTeachingClassId).toList());
+        for (TeachingClass other : tcMap.values()) {
+            for (TeachingClass target : targets) {
+                if (TimeConflictChecker.conflicts(target, other)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     /** 选课前的冲突预检：不写库，只回答"选了会不会撞"。 */
     public List<EnrollmentDtos.ConflictItem> previewConflicts(Long studentId, Long teachingClassId) {
         TeachingClass target = teachingClassMapper.selectById(teachingClassId);
