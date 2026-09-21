@@ -13,6 +13,7 @@ USE iaas;
 
 DROP TABLE IF EXISTS enrollment;
 DROP TABLE IF EXISTS student_application;
+DROP TABLE IF EXISTS exam;
 DROP TABLE IF EXISTS teaching_class;
 DROP TABLE IF EXISTS course;
 DROP TABLE IF EXISTS student;
@@ -148,6 +149,8 @@ CREATE TABLE teaching_class (
     term_id       BIGINT      NOT NULL,
     capacity      INT         NOT NULL DEFAULT 60,
     enrolled      INT         NOT NULL DEFAULT 0,
+    major_id      BIGINT      NULL COMMENT '面向专业，空表示面向全校',
+    grade         INT         NULL COMMENT '面向年级，空表示不限年级',
     weekday       TINYINT     NOT NULL COMMENT '星期 1-7',
     start_section TINYINT     NOT NULL COMMENT '开始节次 1-12',
     end_section   TINYINT     NOT NULL COMMENT '结束节次 1-12',
@@ -160,7 +163,8 @@ CREATE TABLE teaching_class (
     UNIQUE KEY uk_tc_code (code),
     KEY idx_tc_term (term_id),
     KEY idx_tc_teacher (teacher_id),
-    KEY idx_tc_course (course_id)
+    KEY idx_tc_course (course_id),
+    KEY idx_tc_major (major_id, grade)
 ) ENGINE=InnoDB COMMENT='教学班';
 
 -- ---------------------------------------------------------------------
@@ -210,3 +214,29 @@ CREATE TABLE student_application (
     KEY idx_app_student (student_id, created_at),
     KEY idx_app_status (status, created_at)
 ) ENGINE=InnoDB COMMENT='学生申请单与审批';
+
+-- ---------------------------------------------------------------------
+-- 7. 考试安排
+--
+-- 一条记录 = 一个教学班的一场考试。学生看到的"我的考试"是它按本人选课过滤后的结果，
+-- 所以不另建学生级的考试表，避免两处口径。
+-- 时间段用 DATE + TIME 存，不用 DATETIME：考试是按"某天几点到几点"组织的，
+-- 存成时间点会在跨天、时长比较上引入没必要的复杂度。
+-- ---------------------------------------------------------------------
+CREATE TABLE exam (
+    id                BIGINT      NOT NULL AUTO_INCREMENT,
+    teaching_class_id BIGINT      NOT NULL,
+    term_id           BIGINT      NOT NULL,
+    exam_type         VARCHAR(20) NOT NULL DEFAULT '期末考试' COMMENT '期末考试/补考/重修考试',
+    exam_date         DATE        NOT NULL,
+    start_time        TIME        NOT NULL,
+    end_time          TIME        NOT NULL,
+    classroom         VARCHAR(50) NULL,
+    seat_no           VARCHAR(30) NULL COMMENT '座位号，可留空',
+    note              VARCHAR(200) NULL COMMENT '考试形式（闭卷/开卷/上机）等补充说明',
+    created_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_exam_term (term_id, exam_date),
+    KEY idx_exam_tc (teaching_class_id)
+) ENGINE=InnoDB COMMENT='考试安排';
