@@ -10,7 +10,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { ApiError } from '@/api/client'
 import { applicationApi, classroomApi } from '@/api'
-import type { ApplicationOption, ApplicationRow, ClassroomSlot } from '@/api/types'
+import type { ApplicationOption, ApplicationRow, Certificate, ClassroomSlot } from '@/api/types'
 import { toast } from '@/components/useToast'
 import Plate from '@/components/Plate.vue'
 import Btn from '@/components/Btn.vue'
@@ -27,6 +27,8 @@ const state = ref<'loading' | 'ready' | 'empty' | 'error'>('loading')
 const errorDetail = ref('')
 const submitting = ref(false)
 const lastPrecheck = ref('')
+const certificate = ref<Certificate | null>(null)
+const certError = ref('')
 
 const form = ref({ type: '', targetId: null as number | null, target: '', reason: '', materials: '' })
 
@@ -178,6 +180,21 @@ async function withdraw(row: ApplicationRow) {
     toast(e instanceof ApiError ? e.message : '撤回失败', 'bad')
   }
 }
+
+/** 已通过的证明打印申请可以出成品：系统排版，打印后仍要到教务处盖章。 */
+async function openCertificate(row: ApplicationRow) {
+  certError.value = ''
+  try {
+    certificate.value = await applicationApi.certificate(row.id)
+  } catch (e) {
+    certError.value = e instanceof ApiError ? e.message : '证明出具失败'
+    toast(certError.value, 'bad')
+  }
+}
+
+function printCertificate() {
+  window.print()
+}
 </script>
 
 <template>
@@ -275,13 +292,55 @@ async function withdraw(row: ApplicationRow) {
             <template v-else>{{ r.precheckNote ?? '等待教务处审批' }}</template>
           </td>
           <td class="rowact">
+            <Btn
+              v-if="r.type === 'CERTIFICATE' && r.status === '已通过'"
+              variant="quiet"
+              @click="openCertificate(r)"
+            >
+              查看证明
+            </Btn>
             <Btn v-if="r.status === '待审'" variant="quiet" @click="withdraw(r)">撤回</Btn>
-            <span v-else class="dim">—</span>
+            <span v-if="r.status !== '待审' && !(r.type === 'CERTIFICATE' && r.status === '已通过')" class="dim">—</span>
           </td>
         </tr>
       </DataTable>
     </StateHost>
   </Plate>
+
+  <div v-if="certificate" class="print-host" role="dialog" aria-modal="true">
+    <div class="print-bar">
+      <Btn variant="solid" @click="printCertificate">打印 / 存成 PDF</Btn>
+      <Btn variant="quiet" @click="certificate = null">关闭</Btn>
+      <span class="print-bar__hint">打印后到教务处盖章，未盖章的证明不对外生效</span>
+    </div>
+    <article class="sheet-print">
+      <header class="sheet-print__head">
+        <p class="sheet-print__school">福州大学至诚学院</p>
+        <p class="sheet-print__title">{{ certificate.kind }}</p>
+        <p class="sheet-print__no">编号：{{ certificate.no }}</p>
+      </header>
+      <section class="sheet-print__body">
+        <p v-for="(l, i) in certificate.lines" :key="i" class="sheet-print__line">{{ l }}</p>
+        <p v-if="certificate.creditSummary" class="sheet-print__line">
+          {{ certificate.creditSummary }}
+        </p>
+        <dl class="sheet-print__meta">
+          <div><dt>姓名</dt><dd>{{ certificate.studentName }}</dd></div>
+          <div><dt>学号</dt><dd>{{ certificate.studentNo }}</dd></div>
+          <div><dt>学院</dt><dd>{{ certificate.collegeName }}</dd></div>
+          <div><dt>专业</dt><dd>{{ certificate.majorName }}</dd></div>
+          <div><dt>班级</dt><dd>{{ certificate.clazzName }}</dd></div>
+          <div><dt>开具日期</dt><dd>{{ certificate.issuedDate }}</dd></div>
+        </dl>
+      </section>
+      <footer class="sheet-print__foot">
+        <p v-for="(n, i) in certificate.notes" :key="i" class="sheet-print__note">{{ n }}</p>
+        <div class="sheet-print__seal">
+          <span>教务处（盖章）</span>
+        </div>
+      </footer>
+    </article>
+  </div>
 </template>
 
 <style scoped>
@@ -319,5 +378,123 @@ async function withdraw(row: ApplicationRow) {
   background: var(--structure);
   color: var(--face);
   font-size: var(--t-xs);
+}
+
+/* 证明按 A4 的观感排版：打印时只留这一张纸，界面按钮不要印上去 */
+.print-host {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  background: var(--ground);
+  overflow: auto;
+  padding: var(--s-6);
+}
+.print-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  max-width: 720px;
+  margin: 0 auto var(--s-4);
+}
+.print-bar__hint {
+  font-size: var(--t-xs);
+  color: var(--ink-muted);
+}
+.sheet-print {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 25mm 22mm;
+  background: #fff;
+  border: 1px solid var(--line);
+  color: #000;
+  font-size: 15px;
+  line-height: 1.9;
+}
+.sheet-print__head {
+  text-align: center;
+  border-bottom: 2px solid #000;
+  padding-bottom: var(--s-4);
+  margin-bottom: var(--s-8);
+}
+.sheet-print__school {
+  font-size: 20px;
+  letter-spacing: 0.3em;
+}
+.sheet-print__title {
+  font-size: 26px;
+  letter-spacing: 0.4em;
+  margin: var(--s-3) 0;
+}
+.sheet-print__no {
+  font-size: 12px;
+  text-align: right;
+}
+.sheet-print__body {
+  min-height: 120mm;
+}
+.sheet-print__line {
+  margin-bottom: var(--s-3);
+  text-align: justify;
+}
+.sheet-print__meta {
+  margin-top: var(--s-6);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-2) var(--s-6);
+  font-size: 14px;
+}
+.sheet-print__meta dt {
+  display: inline-block;
+  width: 5em;
+  color: #444;
+}
+.sheet-print__meta dd {
+  display: inline;
+  margin: 0;
+}
+.sheet-print__foot {
+  margin-top: var(--s-8);
+}
+.sheet-print__note {
+  font-size: 12px;
+  color: #555;
+}
+.sheet-print__seal {
+  margin-top: var(--s-12);
+  text-align: right;
+  font-size: 14px;
+}
+.sheet-print__seal span {
+  display: inline-block;
+  padding: var(--s-6) var(--s-8);
+  border: 1px dashed #999;
+}
+
+@media print {
+  /* 打印态：隐藏整个应用，只留证明；界面上的按钮与提示不上纸 */
+  :global(body *) {
+    visibility: hidden;
+  }
+  .print-host,
+  .print-host * {
+    visibility: visible;
+  }
+  .print-host {
+    position: absolute;
+    inset: 0;
+    padding: 0;
+    background: #fff;
+  }
+  .print-bar {
+    display: none;
+  }
+  .sheet-print {
+    width: auto;
+    min-height: auto;
+    border: 0;
+    padding: 0;
+    margin: 0;
+  }
 }
 </style>

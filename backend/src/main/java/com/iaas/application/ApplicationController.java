@@ -60,6 +60,12 @@ public class ApplicationController {
         return R.ok();
     }
 
+    /** 出具证明：只有已通过的证明打印申请能出，学生只能出自己的。 */
+    @GetMapping("/{id}/certificate")
+    public R<ApplicationDtos.Certificate> certificate(@PathVariable Long id) {
+        return R.ok(service.certificate(id));
+    }
+
     /** 审批列表：教务与管理员可见。 */
     @GetMapping
     public R<PageResult<ApplicationDtos.Row>> page(

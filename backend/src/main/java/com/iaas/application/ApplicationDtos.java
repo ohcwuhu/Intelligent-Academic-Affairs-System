@@ -1,5 +1,7 @@
 package com.iaas.application;
 
+import java.util.List;
+
 public final class ApplicationDtos {
 
     private ApplicationDtos() {
@@ -35,5 +37,17 @@ public final class ApplicationDtos {
      * 重修是未通过的课程，转专业是专业，免听间听是本学期已选的教学班。
      */
     public record Option(Long id, String label, String note) {
+    }
+
+    /**
+     * 证明成品。系统不盖章，只把证明内容按可打印的版式排出来，
+     * 打印后仍需到教务处盖章——这一点写在证明正文的落款说明里。
+     */
+    public record Certificate(
+            String no, String certName, String kind,
+            String studentName, String studentNo, String gender,
+            String collegeName, String majorName, String clazzName, Integer grade,
+            String issuedDate, String termName,
+            String creditSummary, List<String> lines, List<String> notes) {
     }
 }

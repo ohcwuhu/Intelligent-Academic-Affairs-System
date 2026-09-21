@@ -17,6 +17,7 @@ DROP TABLE IF EXISTS exam;
 DROP TABLE IF EXISTS program_course;
 DROP TABLE IF EXISTS program_module;
 DROP TABLE IF EXISTS program;
+DROP TABLE IF EXISTS fee_rule;
 DROP TABLE IF EXISTS teaching_class;
 DROP TABLE IF EXISTS course;
 DROP TABLE IF EXISTS student;
@@ -310,3 +311,22 @@ CREATE TABLE program_course (
     KEY idx_pc_program (program_id, module),
     KEY idx_pc_name (course_name)
 ) ENGINE=InnoDB COMMENT='培养方案课程';
+
+-- ---------------------------------------------------------------------
+-- 9. 收费规则
+--
+-- 只存"每学分单价"这一个可维护的量：给学生算钱是"学分 × 单价"。
+-- 手册第二十三条只说"按规定缴交重修费用，收费标准按学院有关规定执行"——
+-- 金额本身不在手册里，所以种子数据里是演示值，页面上必须标注清楚。
+-- ---------------------------------------------------------------------
+CREATE TABLE fee_rule (
+    id             BIGINT       NOT NULL AUTO_INCREMENT,
+    item           VARCHAR(40)  NOT NULL COMMENT '收费项目，如 重新修读',
+    credit_price   DECIMAL(6,2) NOT NULL COMMENT '每学分单价（元）',
+    note           VARCHAR(200) NULL,
+    effective_from DATE         NULL,
+    status         TINYINT      NOT NULL DEFAULT 1,
+    updated_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_fee_item (item)
+) ENGINE=InnoDB COMMENT='学分收费规则';

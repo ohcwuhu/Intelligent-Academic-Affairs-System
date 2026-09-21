@@ -16,10 +16,14 @@ import com.iaas.enrollment.TimeConflictChecker;
 import com.iaas.governance.AuditService;
 import com.iaas.student.entity.Student;
 import com.iaas.student.mapper.StudentMapper;
+import com.iaas.system.entity.Clazz;
 import com.iaas.system.entity.Major;
 import com.iaas.system.entity.Term;
+import com.iaas.system.mapper.ClazzMapper;
+import com.iaas.system.mapper.CollegeMapper;
 import com.iaas.system.mapper.MajorMapper;
 import com.iaas.system.mapper.TermMapper;
+import com.iaas.system.entity.College;
 import com.iaas.teaching.entity.TeachingClass;
 import com.iaas.teaching.mapper.TeachingClassMapper;
 import org.springframework.stereotype.Service;
@@ -109,6 +113,8 @@ public class ApplicationService {
     private final TermMapper termMapper;
     private final CourseMapper courseMapper;
     private final MajorMapper majorMapper;
+    private final ClazzMapper clazzMapper;
+    private final CollegeMapper collegeMapper;
     private final TeachingClassMapper teachingClassMapper;
     private final EnrollmentService enrollmentService;
     private final AuditService auditService;
@@ -282,6 +288,76 @@ public class ApplicationService {
     // ------------------------------------------------------------------
     // 教务侧
     // ------------------------------------------------------------------
+
+    /**
+     * 出具证明。
+     *
+     * <p>只有"已通过"的证明打印申请能出成品——没审过就出证明，等于绕开了审批。
+     * 系统负责把内容排成可打印的一页，盖章仍然必须到教务处，
+     * 所以成品里明确写了"打印后到教务处盖章"。
+     */
+    public ApplicationDtos.Certificate certificate(Long applicationId) {
+        UserContext.Principal me = UserContext.require();
+        StudentApplication a = mapper.selectById(applicationId);
+        if (a == null) {
+            throw BizException.notFound("申请单");
+        }
+        boolean self = me.isStudent() && Objects.equals(a.getStudentId(), me.refId());
+        if (!self && !me.isStaff()) {
+            throw BizException.forbidden("只能查看本人申请的证明");
+        }
+        if (!TYPE_CERTIFICATE.equals(a.getType())) {
+            throw new BizException("这张单子不是证明打印申请");
+        }
+        if (!APPROVED.equals(a.getStatus())) {
+            throw new BizException("证明要等教务处审批通过后才能打印，当前状态：" + a.getStatus());
+        }
+        Student s = studentMapper.selectById(a.getStudentId());
+        Major major = s == null || s.getMajorId() == null ? null : majorMapper.selectById(s.getMajorId());
+        Clazz clazz = s == null || s.getClazzId() == null ? null : clazzMapper.selectById(s.getClazzId());
+        College college = s == null || s.getCollegeId() == null
+                ? null : collegeMapper.selectById(s.getCollegeId());
+        Term term = a.getTermId() == null ? null : termMapper.selectById(a.getTermId());
+
+        String certName = a.getTarget() == null ? "在读证明" : a.getTarget();
+        boolean scoreKind = certName.contains("成绩");
+        List<String> lines = new ArrayList<>();
+        String summary = null;
+        if (scoreKind) {
+            EnrollmentDtos.CreditSummary credit = enrollmentService.creditSummary(a.getStudentId());
+            summary = "已获学分 " + credit.earnedCredit() + "，在修学分 " + credit.inProgressCredit()
+                    + "，平均学分绩点 " + credit.gpa();
+            for (EnrollmentDtos.MyCourse c : enrollmentService.myCourses(a.getStudentId(), null)) {
+                if (c.score() != null) {
+                    lines.add(c.courseName() + "（" + c.courseCode() + "）　"
+                            + c.score() + " 分　" + c.credit() + " 学分");
+                }
+            }
+        } else {
+            lines.add("兹证明 " + (s == null ? "" : s.getName()) + "（学号 "
+                    + (s == null ? "" : s.getStudentNo()) + "）系我院 "
+                    + (college == null ? "" : college.getName()) + " "
+                    + (major == null ? "" : major.getName()) + " 专业 "
+                    + (clazz == null ? "" : clazz.getName()) + " 学生，"
+                    + (s == null || s.getGrade() == null ? "" : s.getGrade() + " 级") + "，"
+                    + "现为在读学生。");
+        }
+        List<String> notes = new ArrayList<>();
+        notes.add("本证明由教务系统生成，打印后须到教务处盖章方可对外使用");
+        notes.add("如需英文版或其它格式，请到教务处现场办理");
+
+        return new ApplicationDtos.Certificate(
+                "C%06d".formatted(a.getId()), certName, scoreKind ? "成绩证明" : "在读证明",
+                s == null ? null : s.getName(), s == null ? null : s.getStudentNo(),
+                s == null ? null : s.getGender(),
+                college == null ? null : college.getName(),
+                major == null ? null : major.getName(),
+                clazz == null ? null : clazz.getName(),
+                s == null ? null : s.getGrade(),
+                java.time.LocalDate.now().toString(),
+                term == null ? null : term.getName(),
+                summary, lines, notes);
+    }
 
     public PageResult<ApplicationDtos.Row> page(long page, long size, String status, String type) {
         var q = Wrappers.<StudentApplication>lambdaQuery()

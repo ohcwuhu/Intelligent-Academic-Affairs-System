@@ -162,8 +162,10 @@ INSERT INTO enrollment (student_id, teaching_class_id, term_id, status, score, s
  -- 18 号班只放一个名额且已被占满，用来演示"名额已满"的封条与接口拦截
  (3,18, 4,'SELECTED',NULL,'未录入',NULL,'2026-09-02 11:20:00'),
  -- 林晓彤（学生 2）在 2024-2025-1 的 CS101 是 52 分且没有重修过：
- -- 有它，"重新修读申请"才有可申请的对象（预检要求确实存在未通过的记录）
- (2,12, 1,'SELECTED',52.0,'已录入',0.00,'2024-09-03 09:10:00');
+ -- 有它，"重新修读申请"才有可申请的对象（预检要求确实存在未通过的记录）；
+ -- 她本学期又选了 CS101 的 1 号班，所以她的学分收费账单里会有一条重新修读
+ (2,12, 1,'SELECTED',52.0,'已录入',0.00,'2024-09-03 09:10:00'),
+ (2, 1, 4,'SELECTED',NULL,'未录入',NULL,'2026-09-02 09:08:00');
 
 INSERT INTO sys_user (username, password, real_name, role, ref_id, status) VALUES
  ('admin',  @PWD,'系统管理员','ADMIN',   NULL,1),
@@ -184,6 +186,13 @@ INSERT INTO sys_user (username, password, real_name, role, ref_id, status) VALUE
 UPDATE teaching_class tc
 SET enrolled = (SELECT COUNT(*) FROM enrollment e
                 WHERE e.teaching_class_id = tc.id AND e.status = 'SELECTED');
+
+-- 收费单价：手册只写"按学院有关规定执行"，所以这里是演示值，
+-- 页面上会标"示例标准"，教务可以改
+INSERT INTO fee_rule (item, credit_price, note, effective_from, status) VALUES
+ ('重新修读', 120.00, '演示数据：实际标准以学院重新修读收费管理规定为准', '2024-09-01', 1),
+ ('刷分重新修读', 120.00, '演示数据：同上', '2024-09-01', 1),
+ ('低年级课程补修', 0.00, '转专业、插班后补修低年级课程不收费（演示口径）', '2024-09-01', 1);
 
 -- ---------------------------------------------------------------------
 -- 申请单样本：三种状态各一条，审批页一进去就有待办可看

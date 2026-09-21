@@ -56,6 +56,17 @@ export const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/fee',
+    name: 'fee',
+    component: () => import('@/views/FeeView.vue'),
+    meta: {
+      title: '学分收费',
+      nav: true,
+      group: '办事',
+      roles: ['STUDENT', 'ACADEMIC', 'ADMIN'],
+    },
+  },
+  {
     path: '/me/grades',
     name: 'my-grades',
     component: () => import('@/views/GradesView.vue'),

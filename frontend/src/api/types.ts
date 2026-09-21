@@ -269,6 +269,54 @@ export interface AssistantAnswer {
   durationMs: number
 }
 
+export interface FeeRule {
+  id: number
+  item: string
+  creditPrice: number
+  note: string | null
+  effectiveFrom: string | null
+  status: number
+}
+
+export interface FeeBillItem {
+  courseCode: string | null
+  courseName: string
+  credit: number | null
+  item: string
+  unitPrice: number
+  amount: number
+  reason: string
+}
+
+export interface FeeBill {
+  studentId: number
+  studentNo: string
+  studentName: string
+  termId: number | null
+  termName: string | null
+  items: FeeBillItem[]
+  total: number
+  notes: string[]
+}
+
+export interface Certificate {
+  no: string
+  certName: string
+  kind: string
+  studentName: string | null
+  studentNo: string | null
+  gender: string | null
+  collegeName: string | null
+  majorName: string | null
+  clazzName: string | null
+  grade: number | null
+  issuedDate: string
+  termName: string | null
+  creditSummary: string | null
+  lines: string[]
+  notes: string[]
+}
+
 export interface ClassroomOccupancy {
   classroom: string
   weekday: number

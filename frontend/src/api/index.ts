@@ -24,6 +24,9 @@ import type {
   ProgramRow,
   ClassroomOccupancy,
   ClassroomSlot,
+  Certificate,
+  FeeBill,
+  FeeRule,
   GovernanceOverview,
   KnowledgeChunkDetail,
   KnowledgeDocumentRow,
@@ -123,6 +126,14 @@ export const userApi = {
   setStatus: (id: number, status: number) => post<void>(`/user/${id}/status`, {}, { status }),
 }
 
+export const feeApi = {
+  rules: () => get<FeeRule[]>('/fee/rules'),
+  saveRule: (body: { id?: number | null; item: string; creditPrice: number; note?: string }) =>
+    post<void>('/fee/rule', body),
+  /** 学生查自己的账单；教务带 studentId 查指定学生 */
+  bill: (params?: { termId?: number; studentId?: number }) => get<FeeBill>('/fee/bill', params),
+}
+
 export const classroomApi = {
   /** 某学期全部占用（按教室、星期、节次排好序） */
   usage: (termId?: number) => get<ClassroomOccupancy[]>('/classroom/usage', { termId }),
@@ -185,6 +196,8 @@ export const applicationApi = {
   }) => post<ApplicationSubmitResult>('/application', body),
   mine: () => get<ApplicationRow[]>('/application/mine'),
   withdraw: (id: number) => post<void>(`/application/${id}/withdraw`),
+  /** 已通过的证明打印申请 → 出具可打印的证明 */
+  certificate: (id: number) => get<Certificate>(`/application/${id}/certificate`),
   page: (params: Record<string, unknown>) => get<PageResult<ApplicationRow>>('/application', params),
   review: (id: number, action: 'APPROVE' | 'REJECT', note?: string) =>
     post<ApplicationRow>(`/application/${id}/review`, { action, note }),
