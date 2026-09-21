@@ -3,6 +3,8 @@ package com.iaas.assistant;
 import com.iaas.common.UserContext;
 import com.iaas.enrollment.EnrollmentDtos;
 import com.iaas.enrollment.EnrollmentService;
+import com.iaas.exam.ExamDtos;
+import com.iaas.exam.ExamService;
 import com.iaas.governance.AuditService;
 import com.iaas.governance.ConversationService;
 import com.iaas.governance.KnowledgeGapService;
@@ -47,6 +49,14 @@ public class AssistantService {
     private static final Pattern PROMISE_CLAIM = Pattern.compile(
             "(一定|肯定|保证|百分百|绝对)(能|可以|会|能够)");
 
+    /**
+     * 模型自己说"答不了"。基础提示词里确实要求条款没覆盖时这么回答，
+     * 但生成模型的保守程度每次都不一样：同一批条款，这次答得出、下次就说依据不足。
+     * 检索已经判过证据充分了，模型再拒答一次就不该跟着它走，而是回退成原文摘录。
+     */
+    private static final Pattern MODEL_REFUSAL = Pattern.compile(
+            "依据不足|建议咨询教务处|没有找到相关|无法回答|资料中未(提及|涵盖)");
+
     private static final String BASE_PROMPT = """
             你是高校教务规章问答助手。严格遵守以下规则：
             1. 只能依据「资料」区块里的条款作答，不得使用任何其他知识。
@@ -78,6 +88,7 @@ public class AssistantService {
     private final AuditService auditService;
     private final KnowledgeGapService gapService;
     private final ConversationService conversationService;
+    private final ExamService examService;
     public AssistantDtos.Answer ask(String question, Long conversationId) {
         long t0 = System.currentTimeMillis();
         UserContext.Principal me = UserContext.require();
@@ -162,6 +173,9 @@ public class AssistantService {
                         + "），已丢弃这次生成，改为直接给出原文");
             } else if (PROMISE_CLAIM.matcher(candidate).find()) {
                 notes.add("模型回答里出现了保证性表述，已丢弃这次生成，改为直接给出原文");
+            } else if (MODEL_REFUSAL.matcher(candidate).find()) {
+                // 检索判定证据充分，模型却说自己答不了：以检索的判定为准，给出原文
+                notes.add("模型判断依据不足，但检索到的条款足以作答，已改为直接给出原文");
             } else {
                 answer = candidate;
                 mode = process ? "process" : "generated";
@@ -254,6 +268,7 @@ public class AssistantService {
         EnrollmentDtos.CreditSummary summary = enrollmentService.creditSummary(studentId);
         List<EnrollmentDtos.MyCourse> courses = enrollmentService.myCourses(studentId, termId);
         boolean askTimetable = question.contains("课表") || question.contains("上课时间");
+        boolean askExam = question.contains("考试") || question.contains("考场");
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("termId", termId);
@@ -265,7 +280,36 @@ public class AssistantService {
         data.put("currentCourses", courses);
 
         String answer;
-        if (askTimetable) {
+        if (askExam) {
+            // 考试安排同样属于"系统里有的实时数据"，不该让模型凭印象说
+            List<ExamDtos.Row> exams = examService.my(termId);
+            data.put("exams", exams);
+            StringBuilder sb = new StringBuilder("你本学期的考试安排如下（数据来自教务系统）：\n\n");
+            if (exams.isEmpty()) {
+                sb.append("教务还没有录入你本学期课程的考试安排。");
+            } else {
+                for (ExamDtos.Row e : exams) {
+                    sb.append("· ").append(e.examDate()).append(" ")
+                            .append(e.startTime()).append("-").append(e.endTime())
+                            .append("　").append(e.courseName())
+                            .append("　").append(e.classroom() == null ? "考场待定" : e.classroom());
+                    if (e.daysAhead() != null && e.daysAhead() >= 0) {
+                        sb.append("（").append(e.daysAhead()).append(" 天后）");
+                    }
+                    sb.append("\n");
+                }
+            }
+            List<String> clash = exams.stream()
+                    .filter(e -> !e.conflictWith().isEmpty())
+                    .map(e -> e.examDate() + " " + e.courseName())
+                    .distinct()
+                    .toList();
+            if (!clash.isEmpty()) {
+                sb.append("\n注意：").append(String.join("、", clash))
+                        .append(" 有考试时间重叠，请尽快联系教务处。");
+            }
+            answer = sb.toString().strip();
+        } else if (askTimetable) {
             StringBuilder sb = new StringBuilder("你本学期的课程安排如下（数据来自教务系统实时计算）：\n\n");
             if (courses.isEmpty()) {
                 sb.append("本学期你还没有选课。");

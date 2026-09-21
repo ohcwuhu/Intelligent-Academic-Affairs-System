@@ -265,16 +265,20 @@ public class RetrievalService {
             out.putIfAbsent(c.chunkId(), c);
         }
         // 选出来之后要重排：占位顺序是"先到先得"，不代表谁更相关。
-        // 融合分相同的两条（各在一个通道里排第一、另一个通道里排第二）
-        // 就比它在各自通道里拿到的原始相关度——原始分高说明这条是它那一路的强命中。
-        // 这一步直接决定降级时"原文摘录"先给学生看哪一条。
+        //
+        // 排序按"该条在任一路里的最高原始相关度"，融合分只用来判平手。
+        // 为什么敢跨通道比原始分：三路召回用的是同一个相关度标准（MySQL ngram），
+        // 分数同源可比；RRF 只解决"名次不可比"的问题，不解决"谁最相关"。
+        // 实测教训：「一学期最多能选多少学分」的正确答案（第十七条（三），原始分 8.25）
+        // 在改写通道里排第一，却因融合分最低被排到最后，摘录时前三条根本看不到它，
+        // 答案里也就丢掉了那个"30 学分"。这一步直接决定降级时先给学生看哪一条。
         return out.values().stream()
                 .limit(limit)
                 .sorted(Comparator
-                        .comparingDouble((RetrievedChunk c) -> score.getOrDefault(c.chunkId(), 0.0))
+                        .comparingDouble((RetrievedChunk c) -> bestRaw.getOrDefault(c.chunkId(), 0.0))
                         .reversed()
                         .thenComparing(Comparator.comparingDouble(
-                                (RetrievedChunk c) -> bestRaw.getOrDefault(c.chunkId(), 0.0)).reversed()))
+                                (RetrievedChunk c) -> score.getOrDefault(c.chunkId(), 0.0)).reversed()))
                 .toList();
     }
 

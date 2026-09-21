@@ -37,7 +37,7 @@ public class IntentRouter {
      */
     private static final List<String> PERSONAL_DATA_NOUNS = List.of(
             "成绩", "学分", "绩点", "平均分", "课表", "选课", "成绩单",
-            "排名", "学籍", "档案", "已修", "在修");
+            "排名", "学籍", "档案", "已修", "在修", "考试", "考场");
 
     /**
      * 个人数据的组合判定：先出现"我/自己/本人"，随后提到某项个人数据。
@@ -47,7 +47,7 @@ public class IntentRouter {
      */
     private static final Pattern PERSONAL_COMBO = Pattern.compile(
             "(我|自己|本人).{0,8}(成绩|学分|绩点|平均分|课表|选课|选上|选了|已选|在修|修了|"
-                    + "几门课|多少门课|哪些课|排名|学籍|档案|成绩单)");
+                    + "几门课|多少门课|哪些课|排名|学籍|档案|成绩单|考试|考场|哪天考)");
 
     /** 敏感属性：问这些且不是在问自己，一律按越权处理。 */
     private static final List<String> SENSITIVE_ATTRS = List.of(

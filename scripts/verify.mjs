@@ -66,6 +66,9 @@ async function settle(page) {
  * 直接盯 .skeleton 这个元素本身更可靠。
  */
 async function settleContent(page, timeout = 10000) {
+  // 先给页面一点时间进入加载态：刚 goto 完就查 .skeleton，很可能骨架屏还没渲染出来，
+  // 于是"没有骨架屏"被误判成"已经加载完"，后面读到的就是上一屏的残留内容。
+  await page.waitForTimeout(250)
   await page
     .waitForFunction(() => !document.querySelector('.skeleton'), null, { timeout })
     .catch(() => {})
@@ -91,7 +94,7 @@ async function assertNoError(page, where) {
 }
 
 async function login(page, username, password = '123456') {
-  await page.goto(`${BASE}/#/login`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/login')
   await settle(page)
   await page.fill('#username', username)
   await page.fill('#password', password)
@@ -111,13 +114,32 @@ async function login(page, username, password = '123456') {
 }
 
 async function logout(page) {
-  await page.goto(`${BASE}/#/login`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/login')
   await settle(page)
   // 光清 localStorage 不够：Pinia 里的状态还在内存里，路由守卫仍认为已登录，
   // 于是会被送回首页而不是登录页。清完必须重载，让应用从零恢复状态。
   await page.evaluate(() => localStorage.clear())
   await page.reload({ waitUntil: 'domcontentloaded' })
   await settle(page)
+}
+
+/**
+ * 按 hash 导航。
+ *
+ * 纯 hash 变化是"同文档导航"，如果前一次路由跳转还没落地，这一次会被吞掉，
+ * 结果人停在上一页而脚本以为已经跳过去了（实测踩过：要去专业课程表，落在我的课表）。
+ * 所以这里确认地址真的变了，没变就整页重载一次。
+ */
+async function gotoHash(path, timeout = 6000) {
+  await page.goto(`${BASE}/#${path}`, { waitUntil: 'domcontentloaded' })
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline) {
+    if (page.url().includes(`#${path}`)) return
+    await page.waitForTimeout(150)
+  }
+  await page.goto(`${BASE}/#${path}`, { waitUntil: 'domcontentloaded' })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(300)
 }
 
 const consoleProblems = []
@@ -137,7 +159,7 @@ console.log(`\n验收目标：${BASE}\n`)
 
 // ---------------------------------------------------------------- 鉴权
 await check('未登录访问学生课表会被弹回登录页', async () => {
-  await page.goto(`${BASE}/#/me/timetable`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/me/timetable')
   await settle(page)
   assert(page.url().includes('#/login'), `期望停在登录页，实际 ${page.url()}`)
   return '路由守卫生效'
@@ -172,7 +194,7 @@ await check('课表渲染出本学期课程与上课地点', async () => {
 
 await check('选课列表可用，且已选课程显示为可退选', async () => {
   await page.click('a[href="#/me/select"], a[href="/#/me/select"]').catch(async () => {
-    await page.goto(`${BASE}/#/me/select`, { waitUntil: 'domcontentloaded' })
+    await gotoHash('/me/select')
   })
   await settle(page)
   await assertNoError(page, '选课页')
@@ -186,7 +208,7 @@ await check('选课列表可用，且已选课程显示为可退选', async () =
 await check('冲突课程在列表里就被封条标出，不给选课入口', async () => {
   // 种子数据：17 号班（中国近现代史纲要）与李思远已选的数据结构同为周三 3-4 节。
   // 界面不推算业务规则，冲突结论来自 /api/enrollment/preview/{id}。
-  await page.goto(`${BASE}/#/me/select`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/me/select')
   await settleContent(page)
   await page.fill('#kw', '中国近现代史纲要')
   await page.waitForTimeout(700)
@@ -253,7 +275,7 @@ await check('同一门课的另一个教学班不能重复选', async () => {
 })
 
 await check('选课与退选都能走通，并还原状态', async () => {
-  await page.goto(`${BASE}/#/me/select`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/me/select')
   await settleContent(page)
   await page.fill('#kw', '程序设计基础')
   await page.waitForTimeout(700)
@@ -283,7 +305,7 @@ await check('选课与退选都能走通，并还原状态', async () => {
 })
 
 await check('成绩页给出手算的学分与绩点', async () => {
-  await page.goto(`${BASE}/#/me/grades`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/me/grades')
   await settle(page)
   await assertNoError(page, '成绩页')
   const body = await text(page)
@@ -294,7 +316,7 @@ await check('成绩页给出手算的学分与绩点', async () => {
 })
 
 await check('个人档案显示学号与专业', async () => {
-  await page.goto(`${BASE}/#/me/profile`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/me/profile')
   await settle(page)
   await assertNoError(page, '档案页')
   const body = await text(page)
@@ -304,7 +326,7 @@ await check('个人档案显示学号与专业', async () => {
 
 // ---------------------------------------------------------------- 智能问答
 await check('规则问答给出答案并附原文引用', async () => {
-  await page.goto(`${BASE}/#/assistant`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/assistant')
   await settle(page)
   await page.fill('#q', '重修需要什么条件')
   await page.click('button[type="submit"]')
@@ -376,7 +398,7 @@ await check('教师能打开自己教学班的名单', async () => {
 })
 
 await check('教师访问学生档案会被挡回自己的首页', async () => {
-  await page.goto(`${BASE}/#/admin/students`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/admin/students')
   await settle(page)
   assert(!page.url().includes('/admin/students'), `越权路由没被挡住：${page.url()}`)
   return '按角色重定向'
@@ -434,7 +456,7 @@ await check('课程库、教学班开课、基础数据三页都能渲染', asyn
 })
 
 await check('知识库治理页能看到切片数与发布状态', async () => {
-  await page.goto(`${BASE}/#/admin/knowledge`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/admin/knowledge')
   await settle(page)
   await assertNoError(page, '知识库页')
   const body = await text(page)
@@ -444,7 +466,7 @@ await check('知识库治理页能看到切片数与发布状态', async () => {
 })
 
 await check('反馈与缺口页能看到反馈、缺口与审计日志', async () => {
-  await page.goto(`${BASE}/#/admin/governance`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/admin/governance')
   await settle(page)
   await assertNoError(page, '治理页')
   const body = await text(page)
@@ -456,7 +478,7 @@ await check('反馈与缺口页能看到反馈、缺口与审计日志', async (
 })
 
 await check('教务访问账号管理会被挡回', async () => {
-  await page.goto(`${BASE}/#/admin/accounts`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/admin/accounts')
   await settle(page)
   assert(!page.url().includes('/admin/accounts'), `越权路由没被挡住：${page.url()}`)
   return '仅管理员可进'
@@ -466,7 +488,7 @@ await check('教务访问账号管理会被挡回', async () => {
 await check('管理员登录后能进账号管理并看到账号', async () => {
   await logout(page)
   await login(page, 'admin')
-  await page.goto(`${BASE}/#/admin/accounts`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/admin/accounts')
   await settle(page)
   await assertNoError(page, '账号管理页')
   const body = await text(page)
@@ -475,7 +497,7 @@ await check('管理员登录后能进账号管理并看到账号', async () => {
 })
 
 await check('管理员在问答页也能提问（角色都能用问答）', async () => {
-  await page.goto(`${BASE}/#/assistant`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/assistant')
   await settle(page)
   await assertNoError(page, '管理员问答页')
   await page.fill('#q', '缓考能申请几门')
@@ -488,7 +510,7 @@ await check('管理员在问答页也能提问（角色都能用问答）', asyn
 
 // ---------------------------------------------------------------- 治理与录入（P1/P2）
 await check('知识库页有门禁、切片校验与到期提醒', async () => {
-  await page.goto(`${BASE}/#/admin/knowledge`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/admin/knowledge')
   await settleContent(page)
   await assertNoError(page, '知识库页')
   await page.locator('button:has-text("门禁")').first().click()
@@ -599,7 +621,7 @@ await check('有人选课的教学班删不掉', async () => {
 })
 
 await check('账号停用后登不上，启用后恢复', async () => {
-  await page.goto(`${BASE}/#/admin/accounts`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/admin/accounts')
   await settleContent(page)
   const row = page.locator('tr', { hasText: '2021002' }).first()
   assert(await row.count(), '账号列表里没有 2021002')
@@ -629,7 +651,7 @@ await check('账号停用后登不上，启用后恢复', async () => {
 await check('教师录成绩能保存', async () => {
   await logout(page)
   await login(page, 't1001')
-  await page.goto(`${BASE}/#/teach/classes/2`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/teach/classes/2')
   await settleContent(page)
   await assertNoError(page, '名单页')
   const row = page.locator('tr', { hasText: '2022001' }).first()
@@ -654,7 +676,7 @@ await check('教师录成绩能保存', async () => {
 await check('学生端立刻看到成绩与自动算出的绩点', async () => {
   await logout(page)
   await login(page, '2022001')
-  await page.goto(`${BASE}/#/me/grades`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/me/grades')
   await settleContent(page)
   await assertNoError(page, '成绩页')
   const body = await text(page)
@@ -667,7 +689,7 @@ await check('学生端立刻看到成绩与自动算出的绩点', async () => {
 await check('撤销录入后回到未录入', async () => {
   await logout(page)
   await login(page, 't1001')
-  await page.goto(`${BASE}/#/teach/classes/2`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/teach/classes/2')
   await settleContent(page)
   const row = page.locator('tr', { hasText: '2022001' }).first()
   await row.locator('input.score-input').fill('')
@@ -702,7 +724,7 @@ await check('学生反馈能在治理台被处理', async () => {
   const fbQuestion = pool[slot % pool.length]
   await logout(page)
   await login(page, '2022001')
-  await page.goto(`${BASE}/#/assistant`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/assistant')
   await settle(page)
   await page.fill('#q', fbQuestion)
   await page.click('button[type="submit"]')
@@ -717,7 +739,7 @@ await check('学生反馈能在治理台被处理', async () => {
 
   await logout(page)
   await login(page, 'jw001')
-  await page.goto(`${BASE}/#/admin/governance`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/admin/governance')
   await settleContent(page)
   const block = page.locator('section.block', { hasText: '用户反馈' })
   // 按问题文字定位刚提交的那条，而不是取第一条
@@ -740,7 +762,7 @@ await check('学生反馈能在治理台被处理', async () => {
 })
 
 await check('知识缺口能在治理台标记补录', async () => {
-  await page.goto(`${BASE}/#/admin/governance`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/admin/governance')
   await settleContent(page)
   const block = page.locator('section.block', { hasText: '知识缺口' })
   const rows = block.locator('tbody tr')
@@ -764,7 +786,7 @@ await check('知识缺口能在治理台标记补录', async () => {
 await check('会话历史能读回来，开始新对话能断上下文', async () => {
   await logout(page)
   await login(page, '2022001')
-  await page.goto(`${BASE}/#/assistant`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/assistant')
   await settle(page)
   await page.fill('#q', '考试作弊会怎么处理')
   await page.click('button[type="submit"]')
@@ -793,7 +815,7 @@ await check('已有冲突的课表会把冲突提示出来', async () => {
   // 种子数据里陈子豪（2021001）的数据结构与计算机网络同为周三 3-4 节。
   await logout(page)
   await login(page, '2021001')
-  await page.goto(`${BASE}/#/me/timetable`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/me/timetable')
   await settleContent(page)
   await assertNoError(page, '课表页')
   const body = await text(page)
@@ -804,10 +826,122 @@ await check('已有冲突的课表会把冲突提示出来', async () => {
 })
 
 // ---------------------------------------------------------------- 办事与审批
+// ---------------------------------------------------------------- 考试查询
+await check('学生看到自己的考试安排，按日期排序', async () => {
+  await logout(page)
+  await login(page, '2022001')
+  await gotoHash('/me/exams')
+  await settleContent(page)
+  await assertNoError(page, '我的考试页')
+  const body = await text(page)
+  assert(/数据结构/.test(body), `考试页没有数据结构：${body.slice(0, 160)}`)
+  assert(/博学楼A202/.test(body), '考试页没有考场')
+  assert(/天后|已结束|今天/.test(body), '没有"距考试"的天数')
+  const dates = await page.locator('tbody tr td:first-child').allInnerTexts()
+  assert(dates.length >= 3, `考试条数不对：${dates.length}`)
+  const sorted = [...dates].sort()
+  assert(
+    JSON.stringify(dates) === JSON.stringify(sorted),
+    `考试没有按日期升序：${dates.join('、')}`,
+  )
+  await shot(page, '21-student-exams')
+  return `${dates.length} 场，最早 ${dates[0]}`
+})
+
+await check('教务安排考试时提示教室占用冲突', async () => {
+  await logout(page)
+  await login(page, 'jw001')
+  const created = await page.evaluate(async () => {
+    const token = localStorage.getItem('iaas.token')
+    const res = await fetch('/api/exam', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        teachingClassId: 10,
+        examType: '期末考试',
+        examDate: '2027-01-05',
+        startTime: '14:30',
+        endTime: '16:30',
+        classroom: '博学楼B101',
+      }),
+    })
+    return res.json()
+  })
+  assert(created.code === 0, `安排考试失败：${JSON.stringify(created).slice(0, 140)}`)
+  const conflicts = created.data.conflicts ?? []
+  assert(
+    conflicts.some((c) => c.kind === 'CLASSROOM'),
+    `没有提示教室冲突：${JSON.stringify(created.data).slice(0, 160)}`,
+  )
+  // 只提示不阻断：这一场确实建出来了；验收后删掉，别给演示留脏数据
+  const removed = await page.evaluate(async (id) => {
+    const token = localStorage.getItem('iaas.token')
+    const res = await fetch(`/api/exam/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return res.json()
+  }, created.data.id)
+  assert(removed.code === 0, '清理验收数据失败')
+  return conflicts[0].message.replace(/\s+/g, ' ').slice(0, 56)
+})
+
+await check('教师只看本人教学班的考试，学生安排不了考试', async () => {
+  await logout(page)
+  await login(page, 't1001')
+  const mine = await page.evaluate(async () => {
+    const token = localStorage.getItem('iaas.token')
+    const res = await fetch('/api/exam', { headers: { Authorization: `Bearer ${token}` } })
+    return res.json()
+  })
+  assert(mine.code === 0 && mine.data.length > 0, `教师看不到考试：${JSON.stringify(mine).slice(0, 120)}`)
+  assert(
+    !mine.data.some((r) => r.courseName === '大学英语（四）'),
+    '教师看到了别人教学班的考试',
+  )
+  const denied = await page.evaluate(async () => {
+    const token = localStorage.getItem('iaas.token')
+    const res = await fetch('/api/exam', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teachingClassId: 2, examDate: '2027-02-01', startTime: '09:00', endTime: '11:00' }),
+    })
+    return res.json()
+  })
+  assert(denied.code === 403, `教师不该能安排考试：${JSON.stringify(denied).slice(0, 120)}`)
+  return `教师可见 ${mine.data.length} 场，写接口被拒`
+})
+
+await check('专业课程表按专业筛选', async () => {
+  await logout(page)
+  await login(page, '2022001')
+  await gotoHash('/major/timetable')
+  await settleContent(page)
+  await assertNoError(page, '专业课程表')
+  const first = await text(page)
+  assert(/专业课程表/.test(first), '页面没有渲染')
+  // 学生进来默认就是自己的专业与年级，不该让人自己猜该选哪个
+  assert(/计算机科学与技术/.test(first), `没有默认到本人专业：${first.slice(0, 200)}`)
+  assert(/2022/.test(first), '没有默认到本人生级')
+  assert(/数据结构/.test(first), `本人专业的课表里没有数据结构：${first.slice(0, 200)}`)
+
+  // 换到软件工程：应该出现它的课，且不再有计算机专业的课
+  const options = await page.locator('#major option').allInnerTexts()
+  const idx = options.findIndex((t) => t.includes('软件工程'))
+  assert(idx > 0, '专业下拉里没有软件工程')
+  await page.selectOption('#major', { index: idx })
+  await page.waitForTimeout(1200)
+  const second = await text(page)
+  assert(/Web 应用开发/.test(second), `软件工程课表里没有 Web 应用开发：${second.slice(0, 200)}`)
+  assert(!/数据结构/.test(second), '换了专业还显示上一个专业的课')
+  await shot(page, '22-major-timetable')
+  return '按专业切换后课表随之变化'
+})
+
 await check('学生提交重修申请，系统当场给出预检结论', async () => {
   await logout(page)
   await login(page, '2021002')
-  await page.goto(`${BASE}/#/me/applications`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/me/applications')
   await settleContent(page)
   await assertNoError(page, '我的申请页')
   assert(/我的申请/.test(await text(page)), '我的申请页没渲染')
@@ -854,7 +988,7 @@ await check('无冲突的课申请免听会被拦下', async () => {
 await check('教务审批：待办排在最前，通过后学生能看到意见', async () => {
   await logout(page)
   await login(page, 'jw001')
-  await page.goto(`${BASE}/#/admin/applications`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/admin/applications')
   await settleContent(page)
   await assertNoError(page, '申请审批页')
   const first = page.locator('tbody tr').first()
@@ -871,7 +1005,7 @@ await check('教务审批：待办排在最前，通过后学生能看到意见'
 
   await logout(page)
   await login(page, '2021002')
-  await page.goto(`${BASE}/#/me/applications`, { waitUntil: 'domcontentloaded' })
+  await gotoHash('/me/applications')
   await settleContent(page)
   const body = await text(page)
   assert(
@@ -933,3 +1067,5 @@ writeFileSync(join(OUT, 'verify-report.json'), JSON.stringify(report, null, 2))
 
 console.log(`\n通过 ${report.passed}/${report.total}，截图 ${shots.length} 张 → ${OUT}`)
 process.exit(failed.length ? 1 : 0)
+
+
