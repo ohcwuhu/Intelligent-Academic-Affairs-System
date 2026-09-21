@@ -69,6 +69,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: '我的考试', nav: true, group: '学业', roles: ['STUDENT'] },
   },
   {
+    path: '/me/program',
+    name: 'my-program',
+    component: () => import('@/views/MyProgramView.vue'),
+    meta: { title: '培养计划', nav: true, group: '学业', roles: ['STUDENT'] },
+  },
+  {
     path: '/teach/classes',
     name: 'teach-classes',
     component: () => import('@/views/TeachingClassesMine.vue'),
@@ -133,6 +139,12 @@ export const routes: RouteRecordRaw[] = [
     name: 'admin-import',
     component: () => import('@/views/ImportView.vue'),
     meta: { title: '数据导入', nav: true, group: '教务', roles: ['ACADEMIC', 'ADMIN'] },
+  },
+  {
+    path: '/admin/programs',
+    name: 'admin-programs',
+    component: () => import('@/views/ProgramsView.vue'),
+    meta: { title: '培养方案', nav: true, group: '教务', roles: ['ACADEMIC', 'ADMIN'] },
   },
   {
     path: '/admin/knowledge',

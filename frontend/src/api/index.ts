@@ -19,6 +19,9 @@ import type {
   FeedbackRow,
   ImportReport,
   ImportTarget,
+  ProgramAudit,
+  ProgramDetail,
+  ProgramRow,
   GovernanceOverview,
   KnowledgeChunkDetail,
   KnowledgeDocumentRow,
@@ -113,6 +116,13 @@ export const userApi = {
   resetPassword: (id: number, password: string) =>
     post<void>(`/user/${id}/password`, { password }),
   setStatus: (id: number, status: number) => post<void>(`/user/${id}/status`, {}, { status }),
+}
+
+export const programApi = {
+  list: () => get<ProgramRow[]>('/program'),
+  detail: (id: number) => get<ProgramDetail>(`/program/${id}`),
+  /** 学生查自己；教务带上 studentId 查指定学生 */
+  audit: (studentId?: number) => get<ProgramAudit>('/program/audit', { studentId }),
 }
 
 export const importApi = {

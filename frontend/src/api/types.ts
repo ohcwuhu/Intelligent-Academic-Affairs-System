@@ -269,6 +269,81 @@ export interface AssistantAnswer {
   durationMs: number
 }
 
+export interface ProgramRow {
+  id: number
+  title: string
+  majorId: number | null
+  majorName: string
+  grade: number | null
+  degree: string | null
+  duration: string | null
+  minCredit: number | null
+  sourceNote: string | null
+  status: string
+  importedAt: string | null
+  moduleCount: number
+  courseCount: number
+  courseCreditSum: number
+}
+
+export interface ProgramModuleRow {
+  category: string
+  hoursText: string | null
+  credit: number
+  ratio: number | null
+}
+
+export interface ProgramCourseRow {
+  id: number | null
+  module: string
+  groupName: string | null
+  courseName: string
+  courseType: string
+  assessType: string | null
+  credit: number
+  totalHours: number | null
+  labHours: number | null
+  computerHours: number | null
+  termNo: number | null
+  weekHours: number | null
+  note: string | null
+  required: string | null
+  courseId: number | null
+}
+
+export interface ProgramDetail {
+  program: ProgramRow
+  modules: ProgramModuleRow[]
+  courses: ProgramCourseRow[]
+}
+
+export interface ModuleAudit {
+  category: string
+  required: number
+  earned: number
+  gap: number
+  planCourses: number
+  passedCourses: number
+  missing: string[]
+}
+
+export interface ProgramAudit {
+  studentId: number
+  studentNo: string
+  studentName: string
+  programId: number | null
+  programTitle: string | null
+  majorName: string | null
+  grade: number | null
+  minCredit: number | null
+  earned: number | null
+  gap: number | null
+  complete: boolean
+  modules: ModuleAudit[]
+  passedOutsidePlan: ProgramCourseRow[]
+  notes: string[]
+}
+
 export interface ImportTarget {
   type: string
   label: string

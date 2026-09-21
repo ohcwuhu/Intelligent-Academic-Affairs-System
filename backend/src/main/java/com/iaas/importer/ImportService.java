@@ -68,6 +68,7 @@ public class ImportService {
     private final MajorMapper majorMapper;
     private final ClazzMapper clazzMapper;
     private final AuditService auditService;
+    private final com.iaas.program.ProgramImporter programImporter;
 
     // ------------------------------------------------------------------
     // 类型与模板
@@ -89,7 +90,15 @@ public class ImportService {
                         "工号是主键；学院代码必须在系统里存在",
                         List.of("工号", "姓名", "性别", "学院代码", "职称", "联系电话", "邮箱", "在职状态"),
                         List.of("t2001", "李四", "女", "CS01", "讲师", "13900000000",
-                                "lisi@example.com", "在职")));
+                                "lisi@example.com", "在职")),
+                // 培养方案是一份文件一个方案，走的不是逐行校验那套，
+                // 但仍然从同一个入口进来：教务不需要知道背后有两种导入方式
+                new ImportDtos.Target(com.iaas.program.ProgramImporter.TYPE_PROGRAM, "培养方案",
+                        "按学校给的标准格式整理：第 1 张表是方案总览（含毕业最低学分与学分结构），"
+                                + "后面每张表是一个模块的课程明细",
+                        List.of("（整份文件，无需按列填写）"),
+                        List.of("方案总览 / 通识教育必修课 / 学科基础必修课 / 专业方向必修课 / "
+                                + "专业拓展选修课 / 实践环节")));
     }
 
     private ImportDtos.Target target(String type) {
@@ -116,6 +125,10 @@ public class ImportService {
     }
 
     private ImportDtos.Report run(String type, MultipartFile file, boolean commit) {
+        // 培养方案是"一份文件一个方案"，与逐行导入是两种形状，交给专门的解析器
+        if (com.iaas.program.ProgramImporter.TYPE_PROGRAM.equals(type)) {
+            return programImporter.importFile(file, commit);
+        }
         ImportDtos.Target target = target(type);
         SheetReader.Table table = reader.read(file);
         List<String> cols = target.columns();

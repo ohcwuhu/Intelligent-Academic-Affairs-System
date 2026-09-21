@@ -14,6 +14,9 @@ USE iaas;
 DROP TABLE IF EXISTS enrollment;
 DROP TABLE IF EXISTS student_application;
 DROP TABLE IF EXISTS exam;
+DROP TABLE IF EXISTS program_course;
+DROP TABLE IF EXISTS program_module;
+DROP TABLE IF EXISTS program;
 DROP TABLE IF EXISTS teaching_class;
 DROP TABLE IF EXISTS course;
 DROP TABLE IF EXISTS student;
@@ -240,3 +243,63 @@ CREATE TABLE exam (
     KEY idx_exam_term (term_id, exam_date),
     KEY idx_exam_tc (teaching_class_id)
 ) ENGINE=InnoDB COMMENT='考试安排';
+
+-- ---------------------------------------------------------------------
+-- 8. 培养方案（要求学分与毕业审核的基准）
+--
+-- 三张表的关系：一个方案（program）有若干模块要求学分（program_module），
+-- 模块下是计划课程（program_course）。
+-- 方案不是手写的，是教务把培养方案 Excel 导进来的，所以这里保留来源说明，
+-- 并且允许同一专业存在多份（按年级区分），审核时取"现行"的那一份。
+-- ---------------------------------------------------------------------
+CREATE TABLE program (
+    id          BIGINT       NOT NULL AUTO_INCREMENT,
+    major_id    BIGINT       NULL COMMENT '所属专业，按专业名称匹配；匹配不上留空',
+    major_name  VARCHAR(80)  NOT NULL COMMENT '方案里写的专业名称，匹配不上时的兜底',
+    grade       INT          NULL COMMENT '适用年级，空表示现行方案',
+    title       VARCHAR(160) NOT NULL,
+    degree      VARCHAR(60)  NULL COMMENT '授予学位',
+    duration    VARCHAR(20)  NULL COMMENT '标准学制',
+    min_credit  DECIMAL(5,1) NULL COMMENT '毕业最低学分',
+    source_note VARCHAR(300) NULL COMMENT '来源说明（官网栏目、更新时间）',
+    status      VARCHAR(20)  NOT NULL DEFAULT '现行' COMMENT '现行/停用',
+    imported_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_program_major (major_id, status)
+) ENGINE=InnoDB COMMENT='培养方案';
+
+-- 学分结构：模块维度要求多少学分。毕业审核按它算缺口。
+CREATE TABLE program_module (
+    id         BIGINT       NOT NULL AUTO_INCREMENT,
+    program_id BIGINT       NOT NULL,
+    category   VARCHAR(80)  NOT NULL COMMENT '课程类别，如通识教育必修课',
+    hours_text VARCHAR(40)  NULL COMMENT '学时/周数，原样保留（只有展示价值）',
+    credit     DECIMAL(5,1) NOT NULL COMMENT '该类别要求学分',
+    ratio      DECIMAL(6,4) NULL COMMENT '占比，原样保留',
+    sort_no    INT          NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    KEY idx_pm_program (program_id, sort_no)
+) ENGINE=InnoDB COMMENT='培养方案学分结构';
+
+-- 计划课程：一门课在哪个学期开、多少学分、属于哪个模块。
+CREATE TABLE program_course (
+    id             BIGINT       NOT NULL AUTO_INCREMENT,
+    program_id     BIGINT       NOT NULL,
+    module         VARCHAR(80)  NOT NULL COMMENT '所属模块（培养方案里的工作表名）',
+    group_name     VARCHAR(120) NULL COMMENT '方向/分组标题，如"网络技术与安全方向"',
+    course_name    VARCHAR(120) NOT NULL,
+    course_type    VARCHAR(20)  NOT NULL DEFAULT '理论' COMMENT '理论/实践',
+    assess_type    VARCHAR(20)  NULL,
+    credit         DECIMAL(5,1) NOT NULL,
+    total_hours    INT          NULL,
+    lab_hours      INT          NULL,
+    computer_hours INT          NULL,
+    term_no        INT          NULL COMMENT '第一个开课学期 1-8',
+    week_hours     INT          NULL COMMENT '该学期周学时',
+    note           VARCHAR(200) NULL,
+    required       VARCHAR(20)  NULL COMMENT '必修/选修/任选',
+    course_id      BIGINT       NULL COMMENT '能对上课程库时记下课程 ID',
+    PRIMARY KEY (id),
+    KEY idx_pc_program (program_id, module),
+    KEY idx_pc_name (course_name)
+) ENGINE=InnoDB COMMENT='培养方案课程';

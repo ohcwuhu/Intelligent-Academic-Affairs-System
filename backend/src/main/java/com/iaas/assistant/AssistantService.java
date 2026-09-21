@@ -5,6 +5,8 @@ import com.iaas.enrollment.EnrollmentDtos;
 import com.iaas.enrollment.EnrollmentService;
 import com.iaas.exam.ExamDtos;
 import com.iaas.exam.ExamService;
+import com.iaas.program.ProgramDtos;
+import com.iaas.program.ProgramService;
 import com.iaas.governance.AuditService;
 import com.iaas.governance.ConversationService;
 import com.iaas.governance.KnowledgeGapService;
@@ -14,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -89,6 +92,7 @@ public class AssistantService {
     private final KnowledgeGapService gapService;
     private final ConversationService conversationService;
     private final ExamService examService;
+    private final ProgramService programService;
     public AssistantDtos.Answer ask(String question, Long conversationId) {
         long t0 = System.currentTimeMillis();
         UserContext.Principal me = UserContext.require();
@@ -269,6 +273,8 @@ public class AssistantService {
         List<EnrollmentDtos.MyCourse> courses = enrollmentService.myCourses(studentId, termId);
         boolean askTimetable = question.contains("课表") || question.contains("上课时间");
         boolean askExam = question.contains("考试") || question.contains("考场");
+        boolean askGraduation = question.contains("毕业") || question.contains("够不够")
+                || question.contains("还差") || question.contains("学位");
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("termId", termId);
@@ -279,8 +285,34 @@ public class AssistantService {
         data.put("failedCourses", summary.failedCourses());
         data.put("currentCourses", courses);
 
+        // 培养方案在系统里的时候，把毕业审核的账算给用户看；
+        // 没有方案就明说，不要含糊地讲"以教务处为准"就完了
+        ProgramDtos.Audit audit = programService.audit(studentId);
+        data.put("graduationAudit", audit);
+
         String answer;
-        if (askExam) {
+        if (askGraduation) {
+            StringBuilder sb = new StringBuilder("按你所在专业的现行培养方案（"
+                    + audit.programTitle() + "）算出来的账：\n\n");
+            if (audit.programId() == null) {
+                sb.append("系统里还没有这个专业的培养方案，算不出学分缺口。\n")
+                        .append("已获学分 ").append(summary.earnedCredit())
+                        .append("，其余以教务处审核为准。");
+            } else {
+                sb.append("· 毕业最低学分 ").append(audit.minCredit()).append("\n")
+                        .append("· 已获学分 ").append(audit.earned()).append("\n")
+                        .append("· 还差 ").append(audit.gap()).append(" 学分\n\n");
+                for (ProgramDtos.ModuleAudit m : audit.modules()) {
+                    if (m.gap().compareTo(BigDecimal.ZERO) > 0) {
+                        sb.append("· ").append(m.category()).append("：已获 ")
+                                .append(m.earned()).append(" / 要求 ").append(m.required())
+                                .append("，还差 ").append(m.gap()).append(" 学分\n");
+                    }
+                }
+                sb.append("\n这些数字由教务系统按培养方案与你的成绩直接计算，不是推算的。");
+            }
+            answer = sb.toString().strip();
+        } else if (askExam) {
             // 考试安排同样属于"系统里有的实时数据"，不该让模型凭印象说
             List<ExamDtos.Row> exams = examService.my(termId);
             data.put("exams", exams);

@@ -26,6 +26,10 @@
 考试安排、课表、学分绩点这些"系统里有的实时数据"同样不让模型凭印象说：
 问"我什么时候考试""我这学期选了几门课"，走的是数据库查询，模型不参与生成。
 
+数据不是一条条填的。课程库、学生名册、教师名册、**培养方案**都能按模板批量导入
+（Excel 或 CSV，先校验后入库，有错不入库，按业务键幂等），
+导入培养方案之后，"我还差多少学分能毕业"这句就能按现行方案逐模块算出缺口。
+
 ## 技术栈
 
 | 层 | 选型 |
@@ -38,9 +42,10 @@
 ## 目录
 
 ```
-backend/    Spring Boot 服务（96 个类：common/auth/system/student/teacher/course/
-            teaching/enrollment/grade/schedule/exam/application/knowledge/assistant/governance）
-frontend/   Vue 3 前端（21 个页面 + 11 个自建组件）
+backend/    Spring Boot 服务（111 个类：common/auth/system/student/teacher/course/
+            teaching/enrollment/grade/schedule/exam/application/program/importer/
+            knowledge/assistant/governance）
+frontend/   Vue 3 前端（24 个页面 + 12 个自建组件）
 sql/        schema.sql → seed.sql → knowledge.sql → governance.sql（按序执行）
 eval/       问答评测集与最近一次评测报告
 scripts/    浏览器验收、问答评测、截图脚本
@@ -109,11 +114,11 @@ npm run dev        # http://127.0.0.1:5173，/api 由 Vite 代理到 8080
 ```powershell
 cd backend;  mvn test                    # 29 条单元测试
 cd frontend; npm run build               # 类型检查 + 打包
-node scripts/verify.mjs                  # 49 项浏览器验收（需要前后端都起着）
-node scripts/eval-assistant.mjs          # 28 条问答评测
+node scripts/verify.mjs                  # 58 项浏览器验收（需要前后端都起着）
+node scripts/eval-assistant.mjs          # 29 条问答评测
 ```
 
-最近一次结果：单测 29/29、浏览器验收 49/49、问答评测 28/28（p50 880ms，p95 1508ms）。
+最近一次结果：单测 29/29、浏览器验收 58/58、问答评测 29/29（p50 686ms，p95 1436ms）。
 截图与明细在 `.impeccable/review/`，评测明细在 `eval/report.json`。
 
 ## 文档

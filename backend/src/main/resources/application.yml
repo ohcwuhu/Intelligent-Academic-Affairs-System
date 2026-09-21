@@ -63,6 +63,12 @@ iaas:
     source-path: ${IAAS_KB_PATH:D:/Desktop/福州大学至诚学院学生手册.md}
     auto-ingest: true
 
+  # 培养方案：启动时若库里还没有方案，就从这里自动导入（演示环境不用先手导一遍）。
+  # 路径相对后端的工作目录，启动时的工作目录必须是 backend（见 README）。
+  program:
+    source-dir: ${IAAS_PROGRAM_DIR:../docs/import-samples/培养方案}
+    auto-import: true
+
 logging:
   level:
     com.iaas: info

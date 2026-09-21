@@ -33,17 +33,36 @@ public class SheetReader {
     public record Table(List<String> header, List<List<String>> rows) {
     }
 
+    /** 带工作表名的一张表。培养方案就是靠工作表名区分课程模块的。 */
+    public record NamedTable(String name, Table table) {
+    }
+
     public Table read(MultipartFile file) {
+        List<NamedTable> all = readAll(file);
+        return all.get(0).table();
+    }
+
+    /** 读所有工作表。CSV 只有一个"工作表"，名字用文件名。 */
+    public List<NamedTable> readAll(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new BizException("请选择要导入的文件");
         }
-        String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
+        try {
+            return readAll(file.getOriginalFilename(), file.getBytes());
+        } catch (Exception e) {
+            throw new BizException("文件读取失败：" + e.getMessage());
+        }
+    }
+
+    /** 按字节读，供启动时从磁盘目录导入复用（不经过 MultipartFile）。 */
+    public List<NamedTable> readAll(String fileName, byte[] bytes) {
+        String name = fileName == null ? "" : fileName.toLowerCase();
         try {
             if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
-                return readExcel(file);
+                return readExcel(bytes);
             }
-            String text = decode(file.getBytes());
-            return readCsv(text);
+            return List.of(new NamedTable(fileName == null ? "数据" : fileName,
+                    readCsv(decode(bytes))));
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
@@ -51,30 +70,35 @@ public class SheetReader {
         }
     }
 
-    private Table readExcel(MultipartFile file) throws IOException {
-        try (InputStream in = file.getInputStream(); Workbook wb = WorkbookFactory.create(in)) {
-            org.apache.poi.ss.usermodel.Sheet poiSheet = wb.getSheetAt(0);
-            if (poiSheet == null) {
-                throw new BizException("Excel 里没有工作表");
-            }
+    private List<NamedTable> readExcel(byte[] bytes) throws IOException {
+        try (InputStream in = new java.io.ByteArrayInputStream(bytes);
+             Workbook wb = WorkbookFactory.create(in)) {
             DataFormatter fmt = new DataFormatter();
-            List<List<String>> all = new ArrayList<>();
-            for (Row row : poiSheet) {
-                List<String> cells = new ArrayList<>();
-                for (int i = 0; i < row.getLastCellNum(); i++) {
-                    Cell cell = row.getCell(i);
-                    cells.add(cell == null ? "" : fmt.formatCellValue(cell).trim());
+            List<NamedTable> out = new ArrayList<>();
+            for (int s = 0; s < wb.getNumberOfSheets(); s++) {
+                org.apache.poi.ss.usermodel.Sheet poiSheet = wb.getSheetAt(s);
+                List<List<String>> all = new ArrayList<>();
+                for (Row row : poiSheet) {
+                    List<String> cells = new ArrayList<>();
+                    for (int i = 0; i < row.getLastCellNum(); i++) {
+                        Cell cell = row.getCell(i);
+                        cells.add(cell == null ? "" : fmt.formatCellValue(cell).trim());
+                    }
+                    // 整行空白直接跳过：Excel 里末尾常有这种行
+                    if (cells.stream().anyMatch(c -> !c.isBlank())) {
+                        all.add(cells);
+                    }
                 }
-                // 整行空白直接跳过：Excel 里末尾常有这种行
-                if (cells.stream().anyMatch(c -> !c.isBlank())) {
-                    all.add(cells);
+                if (all.isEmpty()) {
+                    continue;
                 }
+                out.add(new NamedTable(poiSheet.getSheetName(),
+                        new Table(trim(all.get(0)), all.subList(1, all.size()))));
             }
-            if (all.isEmpty()) {
+            if (out.isEmpty()) {
                 throw new BizException("表格里没有内容");
             }
-            List<String> header = all.get(0);
-            return new Table(trim(header), all.subList(1, all.size()));
+            return out;
         }
     }
 

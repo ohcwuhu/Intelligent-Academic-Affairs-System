@@ -941,6 +941,76 @@ await check('专业课程表按专业筛选', async () => {
 })
 
 // ---------------------------------------------------------------- 批量导入
+// ---------------------------------------------------------------- 培养计划与毕业审核
+await check('学生能看到培养计划的学分缺口', async () => {
+  await logout(page)
+  await login(page, '2022001')
+  await gotoHash('/me/program')
+  await settleContent(page)
+  await assertNoError(page, '培养计划页')
+  const body = await text(page)
+  assert(/毕业最低学分/.test(body) && /165/.test(body), `没有显示毕业最低学分：${body.slice(0, 200)}`)
+  assert(/已获学分/.test(body) && /16\.5/.test(body), '没有显示已获学分')
+  assert(/还差/.test(body) && /148\.5/.test(body), '没有显示还差多少')
+  assert(/通识教育必修课/.test(body), '没有模块账目')
+  assert(/中国近现代史纲要|大学英语A/.test(body) || /6\.5/.test(body), '通识模块的已获学分不对')
+  await shot(page, '25-student-program')
+  return '165 / 16.5 / 还差 148.5'
+})
+
+await check('教务能看到培养方案的结构与计划课程', async () => {
+  await logout(page)
+  await login(page, 'jw001')
+  await gotoHash('/admin/programs')
+  await settleContent(page)
+  await assertNoError(page, '培养方案页')
+  const body = await text(page)
+  assert(/计算机科学与技术/.test(body), '没有列出计算机科学与技术的方案')
+  assert(/软件工程/.test(body) && /数字媒体技术/.test(body), '三份方案没有都列出来')
+  assert(/学分结构/.test(body), '没有学分结构')
+  assert(/计划课程/.test(body), '没有计划课程')
+  assert(/课程类别|通识教育必修课/.test(body), '结构表没有渲染')
+
+  // 点模块行筛选课程
+  const before = await page.locator('tbody tr').count()
+  await page.locator('tbody tr', { hasText: '通识教育必修课' }).first().click()
+  await page.waitForTimeout(800)
+  const filtered = await text(page)
+  assert(/已筛通识教育必修课/.test(filtered), `模块筛选没生效：${filtered.slice(-160)}`)
+  await shot(page, '26-program-detail')
+  return `方案与结构可见（行数 ${before}）`
+})
+
+await check('问"还差多少学分能毕业"能算出数', async () => {
+  await logout(page)
+  await login(page, '2022001')
+  const answer = await page.evaluate(async () => {
+    const token = localStorage.getItem('iaas.token')
+    const res = await fetch('/api/assistant/ask', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: '我还差多少学分能毕业' }),
+    })
+    return (await res.json()).data
+  })
+  assert(answer.intent === 'PERSONAL' && answer.mode === 'tool',
+    `没有走个人数据通道：${answer.intent}/${answer.mode}`)
+  assert(/165/.test(answer.answer) && /还差/.test(answer.answer),
+    `答案里没有毕业学分缺口：${answer.answer.slice(0, 160)}`)
+  assert(answer.data?.graduationAudit, '返回数据里没有毕业审核结果')
+  return answer.answer.split('\n').find((l) => l.includes('还差'))?.trim() ?? '已给出缺口'
+})
+
+await check('导入页的类型里包含培养方案', async () => {
+  await logout(page)
+  await login(page, 'jw001')
+  await gotoHash('/admin/import')
+  await settleContent(page)
+  const options = await page.locator('#itype option').allInnerTexts()
+  assert(options.some((t) => t.includes('培养方案')), `类型里没有培养方案：${options.join('、')}`)
+  return options.join('、')
+})
+
 await check('导入页给出模板与系统里已有的代码', async () => {
   await logout(page)
   await login(page, 'jw001')
