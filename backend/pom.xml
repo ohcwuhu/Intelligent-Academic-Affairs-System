@@ -92,6 +92,16 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!--
+          只用来读 Excel：教务给过来的是 .xlsx/.xls，让人另存为 CSV 再传
+          是把麻烦推给用户。写文件仍走 CSV（自己拼，不依赖这个库）。
+        -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.5</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

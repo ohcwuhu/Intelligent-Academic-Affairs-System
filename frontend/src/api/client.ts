@@ -81,3 +81,14 @@ export function post<T>(url: string, body?: unknown, params?: Record<string, unk
 export function del<T>(url: string, params?: Record<string, unknown>) {
   return unwrap<T>(http.delete<ApiEnvelope<T>>(url, { params }))
 }
+
+/**
+ * 上传文件。
+ *
+ * 不手动设置 Content-Type：浏览器要自己带 multipart 的 boundary，
+ * 手写 'multipart/form-data' 反而会让后端解析不出 part。
+ * 导入文件可能大，超时单独放宽。
+ */
+export function postForm<T>(url: string, form: FormData, params?: Record<string, unknown>) {
+  return unwrap<T>(http.post<ApiEnvelope<T>>(url, form, { params, timeout: 120000 }))
+}

@@ -12,6 +12,8 @@
  */
 import { createRequire } from 'node:module'
 import { mkdirSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join as joinPath } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
@@ -936,6 +938,132 @@ await check('专业课程表按专业筛选', async () => {
   assert(!/数据结构/.test(second), '换了专业还显示上一个专业的课')
   await shot(page, '22-major-timetable')
   return '按专业切换后课表随之变化'
+})
+
+// ---------------------------------------------------------------- 批量导入
+await check('导入页给出模板与系统里已有的代码', async () => {
+  await logout(page)
+  await login(page, 'jw001')
+  await gotoHash('/admin/import')
+  await settleContent(page)
+  await assertNoError(page, '数据导入页')
+  const body = await text(page)
+  assert(/数据导入/.test(body) && /下载模板/.test(body), '导入页没有渲染')
+  assert(/系统里已有的代码/.test(body), '没有给出代码对照表')
+  assert(/CS01/.test(body) && /CS2201/.test(body), '代码对照表里没有专业/班级代码')
+  await shot(page, '23-import')
+  return '模板与代码对照都在'
+})
+
+await check('导入先校验：不合格的行逐条指出来，并挡住入库', async () => {
+  const bad = [
+    '课程代码,课程名称,学分,学时,课程性质,考核方式,开课学院代码',
+    'ZZ901,编译原理,3.5,56,专业必修,考试,CS',
+    'ZZ902,计算机图形学,3.25,52,专业选修,考查,CS',
+    'ZZ903,数字逻辑,,48,专业选修,考查,CS',
+  ].join('\n') + '\n'
+  const badPath = joinPath(tmpdir(), 'iaas-import-bad.csv')
+  writeFileSync(badPath, bad, 'utf8')
+  await page.setInputFiles('#ifile', badPath)
+  await page.click('button:has-text("先校验")')
+  await page.waitForTimeout(3000)
+  const body = await text(page)
+  assert(/不合格/.test(body), `没有给出校验结果：${body.slice(-200)}`)
+  assert(/0\.5 的整数倍/.test(body), '没有指出学分单位的问题（手册第十四条）')
+  assert(/学分不能为空/.test(body), '没有指出缺学分的那一行')
+  const disabled = await page.locator('button:has-text("确认导入")').isDisabled()
+  assert(disabled, '有错行时"确认导入"还能点')
+  return '逐行报错，入库按钮被挡住'
+})
+
+await check('改对之后能入库，重复导入不翻倍', async () => {
+  const good = [
+    '课程代码,课程名称,学分,学时,课程性质,考核方式,开课学院代码',
+    'ZZ901,编译原理,3.5,56,专业必修,考试,CS',
+    'ZZ902,计算机图形学,3.0,48,专业选修,考查,CS',
+    'ZZ903,数字逻辑,2.5,40,专业选修,考查,CS',
+  ].join('\n') + '\n'
+  const goodPath = joinPath(tmpdir(), 'iaas-import-ok.csv')
+  writeFileSync(goodPath, good, 'utf8')
+
+  const countBy = async () =>
+    page.evaluate(async () => {
+      const token = localStorage.getItem('iaas.token')
+      const res = await fetch('/api/course?page=1&size=100&keyword=ZZ9', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const body = await res.json()
+      return body.data.records.length
+    })
+
+  const before = await countBy()
+  await page.setInputFiles('#ifile', goodPath)
+  await page.click('button:has-text("先校验")')
+  await page.waitForTimeout(2500)
+  assert(/可以入库|校验通过/.test(await text(page)), '校验没通过')
+  await page.click('button:has-text("确认导入")')
+  await page.waitForTimeout(3000)
+  const afterFirst = await countBy()
+  assert(afterFirst === before + 3, `第一次导入后课程数不对：${before} → ${afterFirst}`)
+
+  // 同一份文件再导一次：按课程代码更新，不该多出三条
+  await page.setInputFiles('#ifile', goodPath)
+  await page.click('button:has-text("先校验")')
+  await page.waitForTimeout(2500)
+  await page.click('button:has-text("确认导入")')
+  await page.waitForTimeout(3000)
+  const afterSecond = await countBy()
+  assert(afterSecond === afterFirst, `重复导入把课程导重复了：${afterFirst} → ${afterSecond}`)
+  await shot(page, '24-import-result')
+  return `导入 3 门课，重复导入后仍是 ${afterSecond} 门`
+})
+
+await check('Excel（.xlsx）可以直接导，不用先另存为 CSV', async () => {
+  // 教务手里就是 Excel，逼人另存为 CSV 等于把麻烦推回给用户
+  const xlsx = join(
+    dirname(fileURLToPath(import.meta.url)),
+    '..',
+    'docs',
+    'import-samples',
+    '课程库-示例.xlsx',
+  )
+  await gotoHash('/admin/import')
+  await settleContent(page)
+  await page.setInputFiles('#ifile', xlsx)
+  await page.click('button:has-text("先校验")')
+  await page.waitForTimeout(3000)
+  const checked = await text(page)
+  assert(/合格/.test(checked), `xlsx 没有通过校验：${checked.slice(-180)}`)
+  await page.click('button:has-text("确认导入")')
+  await page.waitForTimeout(3500)
+  const rows = await page.evaluate(async () => {
+    const token = localStorage.getItem('iaas.token')
+    const res = await fetch('/api/course?page=1&size=100&keyword=ZZ8', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return (await res.json()).data.records.length
+  })
+  assert(rows >= 2, `xlsx 导入后没查到课程：${rows}`)
+  return `Excel 直接导入，库里 ${rows} 门课`
+})
+
+await check('学生导不了数据', async () => {
+  await logout(page)
+  await login(page, '2022001')
+  const r = await page.evaluate(async () => {
+    const token = localStorage.getItem('iaas.token')
+    const form = new FormData()
+    form.append('type', 'course')
+    form.append('file', new File(['课程代码,课程名称,学分\n'], 'x.csv', { type: 'text/csv' }))
+    const res = await fetch('/api/import/preview', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    })
+    return res.json()
+  })
+  assert(r.code === 403, `学生不该能导入数据：${JSON.stringify(r).slice(0, 120)}`)
+  return '导入接口对学生关闭'
 })
 
 await check('学生提交重修申请，系统当场给出预检结论', async () => {

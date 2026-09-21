@@ -129,6 +129,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: '考试安排', nav: true, group: '教务', roles: ['ACADEMIC', 'ADMIN'] },
   },
   {
+    path: '/admin/import',
+    name: 'admin-import',
+    component: () => import('@/views/ImportView.vue'),
+    meta: { title: '数据导入', nav: true, group: '教务', roles: ['ACADEMIC', 'ADMIN'] },
+  },
+  {
     path: '/admin/knowledge',
     name: 'admin-knowledge',
     component: () => import('@/views/KnowledgeView.vue'),

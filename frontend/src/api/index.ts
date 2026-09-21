@@ -1,4 +1,4 @@
-import { del, get, post } from './client'
+import { del, get, post, postForm } from './client'
 import type {
   AppUser,
   ApplicationOption,
@@ -17,6 +17,8 @@ import type {
   ExamRow,
   ExamSaveResult,
   FeedbackRow,
+  ImportReport,
+  ImportTarget,
   GovernanceOverview,
   KnowledgeChunkDetail,
   KnowledgeDocumentRow,
@@ -111,6 +113,26 @@ export const userApi = {
   resetPassword: (id: number, password: string) =>
     post<void>(`/user/${id}/password`, { password }),
   setStatus: (id: number, status: number) => post<void>(`/user/${id}/status`, {}, { status }),
+}
+
+export const importApi = {
+  targets: () => get<ImportTarget[]>('/import/targets'),
+  dictionary: () =>
+    get<{ colleges: Record<string, string>; majors: Record<string, string>; clazzes: Record<string, string> }>(
+      '/import/dictionary',
+    ),
+  preview: (type: string, file: File) => {
+    const form = new FormData()
+    form.append('type', type)
+    form.append('file', file)
+    return postForm<ImportReport>('/import/preview', form)
+  },
+  commit: (type: string, file: File) => {
+    const form = new FormData()
+    form.append('type', type)
+    form.append('file', file)
+    return postForm<ImportReport>('/import/commit', form)
+  },
 }
 
 export const examApi = {

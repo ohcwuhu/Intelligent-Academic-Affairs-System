@@ -269,6 +269,33 @@ export interface AssistantAnswer {
   durationMs: number
 }
 
+export interface ImportTarget {
+  type: string
+  label: string
+  note: string
+  columns: string[]
+  sample: string[]
+}
+
+export interface ImportRowResult {
+  line: number
+  key: string | null
+  ok: boolean
+  message: string | null
+}
+
+export interface ImportReport {
+  type: string
+  label: string
+  fileName: string
+  total: number
+  ok: number
+  failed: number
+  committed: boolean
+  rows: ImportRowResult[]
+  errors: string[]
+}
+
 export interface ExamRow {
   id: number
   teachingClassId: number
