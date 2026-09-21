@@ -15,6 +15,14 @@
 | 先鉴权后检索 | 权限过滤发生在召回之前（`RetrievalService.allowedDocuments()`），无权内容进不了候选集 |
 | 无依据不回答 | 拒答看"相关度分数 + 领域词"两个条件（实测单看分数分不开） |
 
+问明白之后还要能办事，所以系统里有一条完整链路：
+
+**规章问答 → 办事申请 → 系统预检 → 教务审批 → 全过程留痕**
+
+免听/间听、重新修读、转专业、证明打印四类事项走同一套申请单。
+预检只做代码能判准的部分（这门课是否真的冲突、有没有未通过记录、绩点是否达标），
+判不了的写进单据备注交给教务，引用的是与问答同一批条款。
+
 ## 技术栈
 
 | 层 | 选型 |
@@ -28,8 +36,8 @@
 
 ```
 backend/    Spring Boot 服务（85 个类：common/auth/system/student/teacher/course/
-            teaching/enrollment/grade/schedule/knowledge/assistant/governance）
-frontend/   Vue 3 前端（16 个页面 + 10 个自建组件）
+            teaching/enrollment/grade/schedule/application/knowledge/assistant/governance）
+frontend/   Vue 3 前端（18 个页面 + 10 个自建组件）
 sql/        schema.sql → seed.sql → knowledge.sql → governance.sql（按序执行）
 eval/       问答评测集与最近一次评测报告
 scripts/    浏览器验收、问答评测、截图脚本
@@ -90,7 +98,7 @@ npm run dev        # http://127.0.0.1:5173，/api 由 Vite 代理到 8080
 | `2021001` | 学生（陈子豪） | 课表上有一处已存在的冲突（免听批准后录入的历史数据） |
 | `2021002` 及 `2021003` `2022002`–`2022005` | 学生 | 学号即账号，八个学生都能登录 |
 | `t1001` / `t1002` | 教师（张伟 / 王芳） | 我的教学班与名单 |
-| `jw001` | 教务人员 | 档案、开课、知识库治理、反馈与缺口 |
+| `jw001` | 教务人员 | 档案、开课、申请审批、知识库治理、反馈与缺口 |
 | `admin` | 管理员 | 账号管理 |
 
 ## 验证与评测
@@ -98,11 +106,11 @@ npm run dev        # http://127.0.0.1:5173，/api 由 Vite 代理到 8080
 ```powershell
 cd backend;  mvn test                    # 29 条单元测试
 cd frontend; npm run build               # 类型检查 + 打包
-node scripts/verify.mjs                  # 40 项浏览器验收（需要前后端都起着）
+node scripts/verify.mjs                  # 45 项浏览器验收（需要前后端都起着）
 node scripts/eval-assistant.mjs          # 27 条问答评测
 ```
 
-最近一次结果：单测 29/29、浏览器验收 40/40、问答评测 27/27（p50 721ms，p95 1136ms）。
+最近一次结果：单测 29/29、浏览器验收 45/45、问答评测 27/27（p50 721ms，p95 1136ms）。
 截图与明细在 `.impeccable/review/`，评测明细在 `eval/report.json`。
 
 ## 文档
