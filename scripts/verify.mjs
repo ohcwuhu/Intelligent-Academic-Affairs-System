@@ -96,6 +96,17 @@ async function login(page, username, password = '123456') {
   await page.fill('#username', username)
   await page.fill('#password', password)
   await page.click('button[type="submit"]')
+  // 点完不能立刻读页面：按钮会先变成"正在核对"，这时候读到的还是登录前的内容。
+  // 等按钮不再是"正在核对"，或者已经离开登录页、或者出现了错误提示，再往下走。
+  await page
+    .waitForFunction(() => {
+      const btn = document.querySelector('form button[type="submit"]')
+      const busy = btn ? /正在核对|登录中/.test(btn.textContent ?? '') : false
+      const alert = document.querySelector('[role="alert"]')
+      const left = !location.hash.includes('/login')
+      return left || !!alert || !busy
+    }, null, { timeout: 10000 })
+    .catch(() => {})
   await settle(page)
 }
 
@@ -772,6 +783,21 @@ await check('会话历史能读回来，开始新对话能断上下文', async (
   assert(/考试作弊会怎么处理/.test(body), '读回的会话里没有之前问过的问题')
   await shot(page, '17-assistant-history')
   return title.replace(/\s+/g, ' ').slice(0, 46)
+})
+
+await check('已有冲突的课表会把冲突提示出来', async () => {
+  // 正常选课会被拦下，所以这个提示只会出现在"批准免听/间听后由教务录入"的课表上。
+  // 种子数据里陈子豪（2021001）的数据结构与计算机网络同为周三 3-4 节。
+  await logout(page)
+  await login(page, '2021001')
+  await page.goto(`${BASE}/#/me/timetable`, { waitUntil: 'domcontentloaded' })
+  await settleContent(page)
+  await assertNoError(page, '课表页')
+  const body = await text(page)
+  assert(/时间冲突/.test(body), `课表没有提示冲突：${body.slice(0, 220)}`)
+  assert(/数据结构/.test(body) && /计算机网络/.test(body), '课表里没有这两门课')
+  await shot(page, '18-student-timetable-conflict')
+  return body.match(/选课里有\s*\d+\s*处时间冲突/)?.[0] ?? '冲突提示可见'
 })
 
 await check('页面没有未捕获的前端报错', async () => {

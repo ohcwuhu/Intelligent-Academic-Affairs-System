@@ -125,6 +125,10 @@ INSERT INTO enrollment (student_id, teaching_class_id, term_id, status, score, s
  (5,15, 4,'SELECTED',NULL,'未录入',NULL,'2026-09-02 09:26:00'),
  (1, 1, 4,'SELECTED',NULL,'未录入',NULL,'2026-09-02 09:05:00'),
  (1, 2, 4,'SELECTED',NULL,'未录入',NULL,'2026-09-02 09:06:00'),
+ -- 陈子豪（学生 1）的课表刻意留一处冲突：数据结构与计算机网络同为周三 3-4 节。
+ -- 正常选课会被拦下，这条是"免听/间听批准后由教务录入"的历史数据，
+ -- 用来演示课表侧的冲突提示（没有它，界面上永远看不到这个提示）。
+ (1, 4, 4,'SELECTED',NULL,'未录入',NULL,'2026-09-02 09:07:00'),
  (2, 3, 4,'SELECTED',NULL,'未录入',NULL,'2026-09-02 09:20:00'),
  (2, 6, 4,'SELECTED',NULL,'未录入',NULL,'2026-09-02 09:21:00'),
  (5, 6, 4,'SELECTED',NULL,'未录入',NULL,'2026-09-02 10:02:00'),
@@ -139,8 +143,16 @@ INSERT INTO sys_user (username, password, real_name, role, ref_id, status) VALUE
  ('jw001',  @PWD,'王老师',   'ACADEMIC',NULL,1),
  ('t1001',  @PWD,'张伟',     'TEACHER', 1,   1),
  ('t1002',  @PWD,'王芳',     'TEACHER', 2,   1),
+ -- 学号即账号：八个学生都有账号。演示时随手挑一个学生都能进得去，
+ -- 也避免出现"库里有选课记录、却没人能登录看"的账号。
+ ('2021001',@PWD,'陈子豪',   'STUDENT', 1,   1),
  ('2021002',@PWD,'林晓彤',   'STUDENT', 2,   1),
- ('2022001',@PWD,'李思远',   'STUDENT', 4,   1);
+ ('2021003',@PWD,'黄浩然',   'STUDENT', 3,   1),
+ ('2022001',@PWD,'李思远',   'STUDENT', 4,   1),
+ ('2022002',@PWD,'周雅琪',   'STUDENT', 5,   1),
+ ('2022003',@PWD,'吴俊杰',   'STUDENT', 6,   1),
+ ('2022004',@PWD,'郑雨欣',   'STUDENT', 7,   1),
+ ('2022005',@PWD,'孙志明',   'STUDENT', 8,   1);
 
 UPDATE teaching_class tc
 SET enrolled = (SELECT COUNT(*) FROM enrollment e
