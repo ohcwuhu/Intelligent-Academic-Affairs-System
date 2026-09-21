@@ -82,8 +82,16 @@ public class UserController {
         if (req.password() == null || req.password().length() < 6) {
             throw new BizException("口令至少 6 位");
         }
-        if (userMapper.selectById(id) == null) {
+        User user = userMapper.selectById(id);
+        if (user == null) {
             throw BizException.notFound("账号");
+        }
+        // 本人改口令要验原口令：管理员重置是"忘了口令"的场景，
+        // 本人改是"我记得旧口令"的场景；后者不验，等于谁拿到会话就能改掉别人的口令
+        if (self && !Roles.ADMIN.equals(me.role())) {
+            if (req.oldPassword() == null || !encoder.matches(req.oldPassword(), user.getPassword())) {
+                throw new BizException(401, "原口令不正确");
+            }
         }
         User update = new User();
         update.setId(id);
@@ -118,6 +126,6 @@ public class UserController {
                                     String role, Long refId) {
     }
 
-    public record ResetPasswordRequest(String password) {
+    public record ResetPasswordRequest(String password, String oldPassword) {
     }
 }

@@ -30,8 +30,18 @@ const lastPrecheck = ref('')
 
 const form = ref({ type: '', targetId: null as number | null, target: '', reason: '', materials: '' })
 
-const needsTarget = computed(() => form.value.type !== 'CERTIFICATE')
-const needOptions = computed(() => ['ON_EXEMPT', 'RETAKE', 'TRANSFER_MAJOR'].includes(form.value.type))
+/** 对象是文本的事项（证明名称、替换方式、银行账号、教室时段…），与后端的口径一致 */
+const TEXT_TARGET_TYPES = [
+  'CERTIFICATE',
+  'ENGLISH_SUB',
+  'INNOVATION_CREDIT',
+  'VETERAN_EXEMPT',
+  'BANK_ACCOUNT',
+  'MAJOR_DIRECTION',
+  'CLASSROOM',
+]
+const needsTarget = computed(() => !TEXT_TARGET_TYPES.includes(form.value.type))
+const needOptions = computed(() => needsTarget.value)
 const typeText = computed(() => types.value.find((t) => t.code === form.value.type)?.text ?? '')
 
 const columns: Column[] = [
@@ -72,6 +82,11 @@ async function loadOptions() {
   if (!needOptions.value) return
   try {
     options.value = await applicationApi.options(form.value.type)
+    // 后端没给候选时退回文本输入，不要留一个空下拉让人没法提交
+    if (!options.value.length) {
+      options.value = []
+      form.value.targetId = null
+    }
   } catch (e) {
     toast(e instanceof ApiError ? e.message : '可选项加载失败', 'bad')
   }
@@ -132,28 +147,29 @@ async function withdraw(row: ApplicationRow) {
       </FieldRow>
 
       <FieldRow
-        v-if="needsTarget"
+        v-if="needsTarget && options.length"
         label="申请对象"
         for-id="target"
-        :hint="needOptions ? '只列出系统判定可以申请的对象' : '写明要办理的事项'"
+        hint="只列出系统判定可以申请的对象"
       >
-        <select v-if="needOptions" id="target" v-model="form.targetId">
+        <select id="target" v-model="form.targetId">
           <option :value="null">请选择</option>
           <option v-for="o in options" :key="o.id" :value="o.id">{{ o.label }}</option>
         </select>
-        <input v-else id="target" v-model="form.target" placeholder="例如 在读证明" />
       </FieldRow>
-      <p v-else class="form__free">
-        <FieldRow label="证明名称" for-id="cert">
-          <input id="cert" v-model="form.target" placeholder="例如 在读证明、成绩证明" />
+      <FieldRow v-else label="申请对象" for-id="cert" hint="写明事项，例如「在读证明」「用雅思 6.0 替换大学英语（四）」">
+          <input id="cert" v-model="form.target" placeholder="写明要办理的事项" />
         </FieldRow>
-      </p>
 
       <FieldRow label="申请理由" for-id="reason" hint="写清为什么办、办了要解决什么问题">
         <textarea id="reason" v-model="form.reason" rows="3" maxlength="500" />
       </FieldRow>
 
-      <FieldRow label="材料说明" for-id="materials" hint="手册要求交什么就写什么，没有就留空">
+      <FieldRow
+        label="材料说明"
+        for-id="materials"
+        hint="手册要求交什么就写什么；创新创业学分认定与退伍免修必须写"
+      >
         <input id="materials" v-model="form.materials" maxlength="500" />
       </FieldRow>
 

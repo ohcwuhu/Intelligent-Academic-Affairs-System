@@ -115,6 +115,9 @@ export const userApi = {
   create: (body: Record<string, unknown>) => post<number>('/user', body),
   resetPassword: (id: number, password: string) =>
     post<void>(`/user/${id}/password`, { password }),
+  /** 本人改口令：必须带原口令，服务端会校验 */
+  changeMyPassword: (id: number, oldPassword: string, password: string) =>
+    post<void>(`/user/${id}/password`, { password, oldPassword }),
   setStatus: (id: number, status: number) => post<void>(`/user/${id}/status`, {}, { status }),
 }
 

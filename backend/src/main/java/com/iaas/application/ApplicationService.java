@@ -58,6 +58,15 @@ public class ApplicationService {
     public static final String TYPE_RETAKE = "RETAKE";
     public static final String TYPE_TRANSFER_MAJOR = "TRANSFER_MAJOR";
     public static final String TYPE_CERTIFICATE = "CERTIFICATE";
+    public static final String TYPE_MAKEUP = "MAKEUP";
+    public static final String TYPE_SCORE_RETRY = "SCORE_RETRY";
+    public static final String TYPE_ENGLISH_SUB = "ENGLISH_SUB";
+    public static final String TYPE_INNOVATION = "INNOVATION_CREDIT";
+    public static final String TYPE_VETERAN = "VETERAN_EXEMPT";
+    public static final String TYPE_BANK_ACCOUNT = "BANK_ACCOUNT";
+    public static final String TYPE_MAJOR_DIRECTION = "MAJOR_DIRECTION";
+    public static final String TYPE_MINOR = "MINOR";
+    public static final String TYPE_CLASSROOM = "CLASSROOM";
 
     private static final Map<String, String> TYPE_TEXT = new LinkedHashMap<>();
 
@@ -66,7 +75,27 @@ public class ApplicationService {
         TYPE_TEXT.put(TYPE_RETAKE, "重新修读申请");
         TYPE_TEXT.put(TYPE_TRANSFER_MAJOR, "转专业申请");
         TYPE_TEXT.put(TYPE_CERTIFICATE, "证明打印申请");
+        TYPE_TEXT.put(TYPE_MAKEUP, "低年级课程补修");
+        TYPE_TEXT.put(TYPE_SCORE_RETRY, "刷分重新修读");
+        TYPE_TEXT.put(TYPE_ENGLISH_SUB, "英语替换修读");
+        TYPE_TEXT.put(TYPE_INNOVATION, "创新创业学分认定");
+        TYPE_TEXT.put(TYPE_VETERAN, "退伍学生课程免修");
+        TYPE_TEXT.put(TYPE_BANK_ACCOUNT, "银行账号变更");
+        TYPE_TEXT.put(TYPE_MAJOR_DIRECTION, "专业方向申请");
+        TYPE_TEXT.put(TYPE_MINOR, "辅修申请");
+        TYPE_TEXT.put(TYPE_CLASSROOM, "教室借用申请");
     }
+
+    /** 需要填材料才受理的事项：没有证明材料，教务没法判。 */
+    private static final Map<String, String> MATERIAL_REQUIRED = Map.of(
+            TYPE_INNOVATION, "请写明获奖证书/论文/技能证书的名称与取得时间",
+            TYPE_VETERAN, "请写明退伍证编号与退役时间",
+            TYPE_BANK_ACCOUNT, "请写明本人银行账号与开户行（变更原因要写清）");
+
+    /** 对象是文本而不是系统记录的事项。 */
+    private static final java.util.Set<String> TEXT_TARGET_TYPES = java.util.Set.of(
+            TYPE_CERTIFICATE, TYPE_ENGLISH_SUB, TYPE_INNOVATION, TYPE_VETERAN,
+            TYPE_BANK_ACCOUNT, TYPE_MAJOR_DIRECTION, TYPE_CLASSROOM);
 
     private static final String PENDING = "待审";
     private static final String APPROVED = "已通过";
@@ -106,11 +135,28 @@ public class ApplicationService {
                             "以往学期最高 " + num(f.getBestScore()) + " 分，未取得学分"))
                     .toList();
         }
-        if (TYPE_TRANSFER_MAJOR.equals(type)) {
+        if (TYPE_SCORE_RETRY.equals(type)) {
+            // 刷分的前提是"已经通过"：没通过的课该走重修，不是刷分
+            return mapper.passedCourses(studentId, termId).stream()
+                    .map(f -> new ApplicationDtos.Option(f.getCourseId(),
+                            f.getCourseCode() + " " + f.getCourseName(),
+                            "已通过，最高 " + num(f.getBestScore()) + " 分"))
+                    .toList();
+        }
+        if (TYPE_MAKEUP.equals(type)) {
+            // 补修：跟着低年级再修一次，通常是转专业/插班后补修低年级课程
+            return mapper.failedCourses(studentId, termId).stream()
+                    .map(f -> new ApplicationDtos.Option(f.getCourseId(),
+                            f.getCourseCode() + " " + f.getCourseName(),
+                            "以往未通过，可申请随低年级补修"))
+                    .toList();
+        }
+        if (TYPE_TRANSFER_MAJOR.equals(type) || TYPE_MINOR.equals(type)) {
             return majorMapper.selectList(
                             Wrappers.<Major>lambdaQuery().orderByAsc(Major::getCode)).stream()
                     .map(m -> new ApplicationDtos.Option(m.getId(),
-                            m.getCode() + " " + m.getName(), "转入后按新专业培养计划执行"))
+                            m.getCode() + " " + m.getName(),
+                            TYPE_MINOR.equals(type) ? "按辅修培养计划执行" : "转入后按新专业培养计划执行"))
                     .toList();
         }
         if (TYPE_ON_EXEMPT.equals(type)) {
@@ -136,12 +182,26 @@ public class ApplicationService {
             throw new BizException("请把申请理由写清楚一点（至少 5 个字），教务处要据此判断");
         }
         String target = req.target() == null ? "" : req.target().strip();
-        if (TYPE_CERTIFICATE.equals(type)) {
+        // 这些事项的对象不是系统里的记录（证明名称、替换方式、银行账号、教室与时段），
+        // 所以要求填文本；其余类型的对象必须从系统给出的候选里选
+        if (TEXT_TARGET_TYPES.contains(type)) {
             if (target.isBlank()) {
-                throw new BizException("请写明要打印哪种证明");
+                throw new BizException(switch (type) {
+                    case TYPE_CERTIFICATE -> "请写明要打印哪种证明";
+                    case TYPE_ENGLISH_SUB -> "请写明替换方式，例如「用雅思 6.0 替换大学英语（四）」";
+                    case TYPE_BANK_ACCOUNT -> "请写明新的银行账号与开户行";
+                    case TYPE_MAJOR_DIRECTION -> "请写明要选的专业方向";
+                    case TYPE_INNOVATION -> "请写明认定的项目名称";
+                    case TYPE_VETERAN -> "请写明免修的课程";
+                    default -> "请写明借用的教室与时段";
+                });
             }
         } else if (req.targetId() == null) {
             throw new BizException("请选择要申请的对象");
+        }
+        if (MATERIAL_REQUIRED.containsKey(type)
+                && (req.materials() == null || req.materials().isBlank())) {
+            throw new BizException(MATERIAL_REQUIRED.get(type));
         }
 
         Long termId = enrollmentService.currentTermId();
@@ -259,6 +319,30 @@ public class ApplicationService {
     private String precheck(String type, Long studentId, Long termId, Long targetId) {
         List<String> notes = new ArrayList<>();
         switch (type) {
+            case TYPE_MAKEUP -> {
+                if (!failedCourse(studentId, termId, targetId)) {
+                    throw new BizException("这门课你没有未通过的记录，不需要补修");
+                }
+                notes.add("以往学期有未通过的记录，符合补修前提");
+                notes.add("补修要跟随低年级教学班上课；时间冲突时按学生手册第十九条申请免听/间听");
+            }
+            case TYPE_SCORE_RETRY -> {
+                if (!passedCourse(studentId, termId, targetId)) {
+                    throw new BizException("这门课你还没有通过，不能刷分；请改提「重新修读」申请（学生手册第二十三条）");
+                }
+                notes.add("这门课已经通过，属于刷分重新修读");
+                notes.add("成绩按多次考试的最高一次记载，学生手册第二十三条");
+            }
+            case TYPE_ENGLISH_SUB -> notes.add("英语替换修读按学院英语教学改革的口径审核，需教务处确认替换关系");
+            case TYPE_INNOVATION -> {
+                notes.add("奖励学分可用于申请免修免考任意选修课，学生手册第十九条");
+                notes.add("材料由教务处核对原件，认定结果以教务处为准");
+            }
+            case TYPE_VETERAN -> notes.add("退伍学生课程免修按学院退伍复学管理办法执行，材料需核验原件");
+            case TYPE_BANK_ACCOUNT -> notes.add("账号变更直接影响退费与补助发放，提交后由财务与教务处各核一次");
+            case TYPE_MAJOR_DIRECTION -> notes.add("专业方向在培养方案里是二选一，一经确定不再随意变更");
+            case TYPE_MINOR -> notes.add("辅修按第二专业培养计划执行，需满足开课人数要求");
+            case TYPE_CLASSROOM -> notes.add("教室借用需写明用途与使用时段，冲突由教务处协调");
             case TYPE_ON_EXEMPT -> {
                 // 必须"这门课"就在冲突里，而不是"本学期有别的冲突"：
                 // 免听/间听是针对具体课程的申请，拿一门不冲突的课来申请站不住脚
@@ -315,6 +399,16 @@ public class ApplicationService {
             default -> notes.add("证明打印为事务性申请，教务处核对后出证");
         }
         return String.join("；", notes);
+    }
+
+    private boolean failedCourse(Long studentId, Long termId, Long courseId) {
+        return mapper.failedCourses(studentId, termId).stream()
+                .anyMatch(f -> Objects.equals(f.getCourseId(), courseId));
+    }
+
+    private boolean passedCourse(Long studentId, Long termId, Long courseId) {
+        return mapper.passedCourses(studentId, termId).stream()
+                .anyMatch(f -> Objects.equals(f.getCourseId(), courseId));
     }
 
     /** 当前教学周。学期日期没配好时返回 null，不阻断流程。 */

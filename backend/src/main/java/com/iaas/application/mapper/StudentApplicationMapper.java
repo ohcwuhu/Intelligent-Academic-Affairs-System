@@ -34,6 +34,28 @@ public interface StudentApplicationMapper extends BaseMapper<StudentApplication>
     List<FailedCourse> failedCourses(@Param("studentId") Long studentId,
                                      @Param("currentTermId") Long currentTermId);
 
+    /**
+     * 学生在以往学期已经通过的课程，用于"刷分重新修读"申请。
+     *
+     * <p>与 failedCourses 是一对反义查询：刷分的前提是已经通过，
+     * 没通过的该走重新修读，两条规则不能混。
+     */
+    @Select("""
+            SELECT c.id AS courseId, c.code AS courseCode, c.name AS courseName,
+                   MIN(e.score) AS lowestScore, MAX(e.score) AS bestScore
+            FROM enrollment e
+            JOIN teaching_class t ON t.id = e.teaching_class_id
+            JOIN course c ON c.id = t.course_id
+            WHERE e.student_id = #{studentId}
+              AND e.status = 'SELECTED'
+              AND e.term_id <> #{currentTermId}
+            GROUP BY c.id, c.code, c.name
+            HAVING COALESCE(MAX(e.score), 0) >= 60
+            ORDER BY c.code
+            """)
+    List<FailedCourse> passedCourses(@Param("studentId") Long studentId,
+                                     @Param("currentTermId") Long currentTermId);
+
     /** 查询结果行：未通过课程。 */
     @Data
     class FailedCourse {
