@@ -27,6 +27,12 @@ import type {
   Certificate,
   FeeBill,
   FeeRule,
+  CourseComponents,
+  GradeComponent,
+  MessageRow,
+  MyTextbooks,
+  NoticeRow,
+  StudentComponents,
   GovernanceOverview,
   KnowledgeChunkDetail,
   KnowledgeDocumentRow,
@@ -124,6 +130,31 @@ export const userApi = {
   changeMyPassword: (id: number, oldPassword: string, password: string) =>
     post<void>(`/user/${id}/password`, { password, oldPassword }),
   setStatus: (id: number, status: number) => post<void>(`/user/${id}/status`, {}, { status }),
+}
+
+export const infoApi = {
+  notices: () => get<NoticeRow[]>('/info/notices'),
+  publish: (body: { title: string; content: string; targetRole?: string | null; pinned?: boolean }) =>
+    post<number>('/info/notice', body),
+  messages: (studentId?: number) => get<MessageRow[]>('/info/messages', { studentId }),
+  ask: (content: string) => post<number>('/info/message', { content }),
+  reply: (id: number, content: string) => post<void>(`/info/message/${id}/reply`, { content }),
+}
+
+export const textbookApi = {
+  mine: (termId?: number) => get<MyTextbooks>('/textbook/my', { termId }),
+  order: (id: number) => post<void>(`/textbook/${id}/order`),
+  cancel: (id: number) => del<void>(`/textbook/${id}/order`),
+  list: (teachingClassId?: number) =>
+    get<Record<string, unknown>[]>('/textbook', { teachingClassId }),
+  save: (body: Record<string, unknown>) => post<number>('/textbook', body),
+}
+
+export const gradeComponentApi = {
+  byClass: (teachingClassId: number) =>
+    get<StudentComponents[]>('/grade/components', { teachingClassId }),
+  save: (items: GradeComponent[]) => post<number>('/grade/components', items),
+  mine: () => get<CourseComponents[]>('/grade/my-components'),
 }
 
 export const feeApi = {

@@ -7,8 +7,8 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import { ApiError } from '@/api/client'
-import { enrollmentApi } from '@/api'
-import type { CreditSummary, MyCourse } from '@/api/types'
+import { enrollmentApi, gradeComponentApi } from '@/api'
+import type { CourseComponents, CreditSummary, MyCourse } from '@/api/types'
 import { creditText, gpaText, scoreText } from '@/utils/format'
 import Plate from '@/components/Plate.vue'
 import DataTable from '@/components/DataTable.vue'
@@ -33,7 +33,11 @@ async function load() {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  // 成绩构成是这一页的一部分，进页面就带上；有就显示，没有不占位
+  await loadComponents()
+})
 
 const byTerm = computed(() => {
   const map = new Map<string, MyCourse[]>()
@@ -52,7 +56,26 @@ const columns: Column[] = [
   { key: 'score', label: '成绩', width: '80px', align: 'right' },
   { key: 'gp', label: '绩点', width: '80px', align: 'right' },
   { key: 'status', label: '状态', width: '90px' },
+  { key: 'component', label: '成绩构成', width: '150px' },
 ]
+
+/** 分项构成：平时/期中/期末。按需拉取，不在首屏加请求。 */
+const components = ref<Map<string, CourseComponents>>(new Map())
+const componentError = ref('')
+
+async function loadComponents() {
+  componentError.value = ''
+  try {
+    const list = await gradeComponentApi.mine()
+    components.value = new Map(list.map((c) => [`${c.courseCode}-${c.termName}`, c]))
+  } catch (e) {
+    componentError.value = e instanceof ApiError ? e.message : '成绩构成加载失败'
+  }
+}
+
+function componentsOf(c: { courseCode: string; termName?: string | null }) {
+  return components.value.get(`${c.courseCode}-${c.termName ?? null}`)?.items ?? []
+}
 </script>
 
 <template>
@@ -107,6 +130,16 @@ const columns: Column[] = [
             </td>
             <td class="num num-end">{{ c.gradePoint === null ? '-' : gpaText(c.gradePoint) }}</td>
             <td>{{ c.scoreStatus }}</td>
+            <td>
+              <template v-if="componentsOf(c).length">
+                <span v-for="x in componentsOf(c)" :key="x.item" class="part">
+                  {{ x.item }}
+                  <span class="num">{{ x.score ?? '—' }}</span>
+                  <span v-if="x.weight != null" class="dim">×{{ x.weight }}%</span>
+                </span>
+              </template>
+              <Btn v-else variant="quiet" @click="loadComponents">看构成</Btn>
+            </td>
           </tr>
         </DataTable>
       </section>

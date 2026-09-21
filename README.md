@@ -46,10 +46,10 @@
 ## 目录
 
 ```
-backend/    Spring Boot 服务（111 个类：common/auth/system/student/teacher/course/
+backend/    Spring Boot 服务（137 个类：common/auth/system/student/teacher/course/
             teaching/enrollment/grade/schedule/exam/application/program/importer/
             knowledge/assistant/governance）
-frontend/   Vue 3 前端（24 个页面 + 12 个自建组件）
+frontend/   Vue 3 前端（28 个页面 + 12 个自建组件）
 sql/        schema.sql → seed.sql → knowledge.sql → governance.sql（按序执行）
 eval/       问答评测集与最近一次评测报告
 scripts/    浏览器验收、问答评测、截图脚本
@@ -118,11 +118,11 @@ npm run dev        # http://127.0.0.1:5173，/api 由 Vite 代理到 8080
 ```powershell
 cd backend;  mvn test                    # 29 条单元测试
 cd frontend; npm run build               # 类型检查 + 打包
-node scripts/verify.mjs                  # 60 项浏览器验收（需要前后端都起着）
+node scripts/verify.mjs                  # 66 项浏览器验收（需要前后端都起着）
 node scripts/eval-assistant.mjs          # 29 条问答评测
 ```
 
-最近一次结果：单测 29/29、浏览器验收 60/60、问答评测 29/29（p50 659ms，p95 1632ms）。
+最近一次结果：单测 29/29、浏览器验收 66/66、问答评测 29/29（p50 731ms，p95 1489ms）。
 截图与明细在 `.impeccable/review/`，评测明细在 `eval/report.json`。
 
 ## 文档

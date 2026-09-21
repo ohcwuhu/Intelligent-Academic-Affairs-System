@@ -4,7 +4,7 @@
 | --- | --- |
 | 文档版本 | v1.0 |
 | 日期 | 2026-09-20 |
-| 对应实现 | 仓库当前 HEAD（后端 111 个类 / 22 张表，前端 24 个页面） |
+| 对应实现 | 仓库当前 HEAD（后端 137 个类 / 28 张表，前端 28 个页面） |
 | 语料 | 《福州大学至诚学院学生手册》第三部分 学生管理规定，179 片切片 |
 | 一句话定义 | 把教务规章做成"有出处、能落地、不编造"的问答，并把日常教务业务（课表、选课、成绩、学籍档案）收在同一个系统里 |
 
@@ -18,7 +18,7 @@
 
 配套产物：
 
-- 浏览器验收脚本 `scripts/verify.mjs`，60 项，覆盖四个角色的关键路径、治理闭环、办事闭环、批量导入与毕业审核。
+- 浏览器验收脚本 `scripts/verify.mjs`，66 项，覆盖四个角色的关键路径、治理闭环、办事闭环、批量导入、毕业审核与日常事务。
 - 问答评测集 `eval/assistant-cases.json`，29 条，九层用例。
 - 单元测试 29 条（数值接地 9 条 + 注入防护 20 条）。
 - 验收留痕 `.impeccable/review/`（截图与 JSON 报告）、`eval/report.json`。
@@ -329,6 +329,29 @@
    其余按 `PL00001` 起的流水号编号，并记在方案课程上。教务在「培养方案」页能直接看到
    "这门计划课程对到了哪个课程码"；学校将来给了正式编号，在课程库里改掉即可，方案不用重导。
 
+### 6.12 日常事务（收费、证明、通知、教材、成绩构成）
+
+这一节是"教务日常"里最常被用到、又最容易被漏掉的一批：办完事之后还要交钱、要开证明、
+要知道通知、要订教材、要看平时分。它们不需要新机制，但缺了就不像一套能用的系统。
+
+| 编号 | 需求 | 优先级 | 验收标准 | 状态 |
+| --- | --- | --- | --- | --- |
+| REQ-DAY-01 | 学分收费查询 | P1 | 学生看到本学期应缴明细（哪门课、多少学分、按哪个项目、单价多少、为什么收）与合计；单价由教务维护 | 已实现并验收 |
+| REQ-DAY-02 | 收费口径可解释 | P0 | 收费判据来自手册第二十三条（重新修读收费、已通过的课再修按重修口径、首修不收费）；金额由"学分 × 单价"算得；单价是演示值这一点必须在页面上写明 | 已实现并验收 |
+| REQ-DAY-03 | 证明打印成品 | P1 | 只有"已通过"的证明打印申请能出成品，且只能出本人的；按 A4 观感排版、打印时只留证明那一张纸；页脚注明"打印后须到教务处盖章" | 已实现并验收 |
+| REQ-DAY-04 | 通知中心 | P1 | 教务发布通知（可置顶、可指定角色），全员按角色可见 | 已实现并验收 |
+| REQ-DAY-05 | 学生留言 | P1 | 学生留言只能看自己的；教务在同一页回复，学生能看到"教务处回复" | 已实现并验收 |
+| REQ-DAY-06 | 教材订购 | P2 | 学生按本学期所选课程看到教材（书名/出版社/ISBN/定价），可订购与取消；订购记录按"学生 × 教材"唯一 | 已实现并验收 |
+| REQ-DAY-07 | 成绩构成 | P1 | 教师录平时/期中/期末的分项与权重；学生端能展开看到构成；权重合计不强制 100，但显示当前合计 | 已实现并验收 |
+| REQ-DAY-08 | 教室使用情况 | P1 | 按学期+星期+节次看该时段哪些教室被谁占用、哪些空着；数据来自排课结果，不另建占用表 | 已实现并验收 |
+| REQ-DAY-09 | 教室借用申请 | P2 | 借用申请带结构化时段；预检判同类时段该教室是否已被排课占用，占用则拒绝并报出占用课程 | 已实现并验收 |
+| REQ-DAY-10 | 申请类型扩展 | P1 | 低年级补修、刷分重新修读、英语替换修读、创新创业学分、退伍免修、银行账号变更、专业方向、辅修申请，各自带预检（补修须真未通过、刷分须已通过、材料类必须交材料） | 已实现并验收（刷分对象已验收） |
+| REQ-DAY-11 | 学生自助改口令 | P1 | 本人改口令必须验原口令；管理员重置不需要（"忘了口令"场景） | 已实现并验收 |
+
+收费这条特别说明一下：手册第二十三条写的是"按规定缴交重修费用，收费标准按学院有关规定执行"——
+**金额本身不在手册里**。所以系统只提供"单价 × 学分"的计算框架与演示单价，
+并在页面上明确标注，不假装自己知道真实收费标准。
+
 ## 7. 非功能需求
 
 | 编号 | 需求 | 指标 | 状态 |
@@ -343,7 +366,7 @@
 
 ## 8. 数据模型
 
-22 张表，分三块。**不建物理外键**，便于毕设环境随时清库重建；一致性靠服务层与事务保证。
+28 张表，分三块。**不建物理外键**，便于毕设环境随时清库重建；一致性靠服务层与事务保证。
 
 ### 8.1 业务表（15）
 
@@ -361,6 +384,10 @@
 | `program` | 培养方案 | 一份方案一个专业（可按年级多份），只有一份"现行"；来源写清楚，因为它是毕业审核的依据 |
 | `program_module` | 学分结构 | 模块维度要求学分，毕业审核按它算缺口 |
 | `program_course` | 计划课程 | 模块、方向分组、学分、学时、开课学期与周学时；能对上课程库时记下 `course_id` |
+| `fee_rule` | 收费规则 | 只存"每学分单价"这一个可维护的量；金额由"学分 × 单价"算得 |
+| `notice` / `student_message` | 通知与留言 | 通知按角色可见；留言学生只看自己的，教务回复在同一行 |
+| `textbook` / `textbook_order` | 教材与订购 | 教材挂教学班；订购按"学生 × 教材"唯一，重复点不会多出记录 |
+| `grade_component` | 成绩构成 | 平时/期中/期末的分项与权重；总评仍是 `enrollment.score` 那一个数 |
 
 设计取舍：**成绩与选课不拆表**。一个学生在一个教学班只有一条记录，录入成绩就是更新这条记录，避免"选课表与成绩表对不齐"的经典问题。**已获学分不存快照**，由代码从成绩实时汇总，避免两处口径。
 
@@ -418,6 +445,7 @@
 | 考试 | `GET /api/exam/my`（学生）、`GET /api/exam`（教务/教师）、`POST /api/exam`（教务）、`DELETE /api/exam/{id}`（教务） |
 | 培养方案 | `GET /api/program`（方案列表）、`GET /api/program/{id}`（结构 + 计划课程）、`GET /api/program/audit`（学生查自己，教务带 studentId 查指定学生） |
 | 批量导入 | `GET /api/import/targets`（类型与模板）、`GET /api/import/dictionary`（已有代码）、`POST /api/import/preview`（只校验）、`POST /api/import/commit`（校验后入库） |
+| 日常事务 | `GET /api/fee/{rules,bill}`、`POST /api/fee/rule`（教务）、`POST /api/application/{id}/certificate`、`GET/POST /api/info/notices|notice|messages|message|message/{id}/reply`、`GET/POST /api/textbook|textbook/my|textbook/{id}/order`、`GET/POST /api/grade/components|my-components`、`GET /api/classroom/{usage,slot}` |
 | 问答 | `GET /api/assistant/status`、`POST /api/assistant/ask`、`GET /api/assistant/conversations`、`GET /api/assistant/conversations/{id}` |
 | 知识库 | `GET /api/knowledge/documents`、`GET /api/knowledge/chunks/{id}`、`GET /api/knowledge/search`、`POST /api/knowledge/reingest`、`GET /api/knowledge/stats`、`GET /api/knowledge/documents/{id}/gate`、`GET /api/knowledge/documents/{id}/chunk-quality`、`POST /api/knowledge/documents/{id}/{submit,publish,expire}`、`GET /api/knowledge/documents/expiring` |
 | 办事与审批 | `GET /api/application/types`、`GET /api/application/options`、`POST /api/application`、`GET /api/application/mine`、`POST /api/application/{id}/withdraw`、`GET /api/application`（教务）、`POST /api/application/{id}/review`（教务） |
@@ -481,8 +509,8 @@
 
 | 脚本 | 覆盖 | 最新结果 |
 | --- | --- | --- |
-| `scripts/verify.mjs` | 60 项浏览器验收，四角色关键路径 + 治理闭环 + 知识库生命周期 + 办事闭环 + 导入与毕业审核 | 60/60 通过，28 张截图 |
-| `scripts/eval-assistant.mjs` | 29 条问答评测，九层用例 | 29/29 通过，p50 659ms / p95 1632ms |
+| `scripts/verify.mjs` | 66 项浏览器验收：四角色关键路径 + 治理闭环 + 知识库生命周期 + 办事闭环 + 导入与毕业审核 + 日常事务 | 66/66 通过，33 张截图 |
+| `scripts/eval-assistant.mjs` | 29 条问答评测，九层用例 | 29/29 通过，p50 731ms / p95 1489ms |
 | `mvn test` | 数值接地 9 条 + 注入防护 20 条 | 29/29 通过 |
 | `npm run build` | 前端类型检查与打包 | 通过 |
 
@@ -643,3 +671,4 @@ java -jar target\iaas-backend-1.0.0.jar --server.port=8082 --iaas.assistant.llm.
 | v1.3 | 2026-09-21 | 补「批量导入」（REQ-IMP-01~09）：Excel/CSV、先校验后入库、按业务键幂等、有错不入库；支持培养方案整份导入 |
 | v1.4 | 2026-09-21 | 补「培养计划与毕业审核」（REQ-PRG-01~06）：用三份真实培养方案（计算机科学与技术、软件工程、数字媒体技术）验证导入与逐模块缺口计算；问答接入毕业学分缺口，补掉本 PRD 承认的最大能力缺口 |
 | v1.5 | 2026-09-21 | 培养方案导入时同步课程库（REQ-PRG-07）：对得上的复用原课程码，对不上的由系统按 PL+流水号发码，课程码全局唯一；「培养方案」页显示每门计划课程对齐到的课程码。课程库由 16 门增至 179 门 |
+| v1.6 | 2026-09-21 | 补「日常事务」（REQ-DAY-01~11）：学分收费查询、证明打印成品、通知中心、学生留言、教材订购、成绩构成、教室使用情况与教室借用、申请类型扩到 13 类、学生自助改口令；验收扩到 66 项 |

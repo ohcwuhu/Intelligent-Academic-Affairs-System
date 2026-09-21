@@ -18,6 +18,11 @@ DROP TABLE IF EXISTS program_course;
 DROP TABLE IF EXISTS program_module;
 DROP TABLE IF EXISTS program;
 DROP TABLE IF EXISTS fee_rule;
+DROP TABLE IF EXISTS textbook_order;
+DROP TABLE IF EXISTS textbook;
+DROP TABLE IF EXISTS grade_component;
+DROP TABLE IF EXISTS student_message;
+DROP TABLE IF EXISTS notice;
 DROP TABLE IF EXISTS teaching_class;
 DROP TABLE IF EXISTS course;
 DROP TABLE IF EXISTS student;
@@ -330,3 +335,80 @@ CREATE TABLE fee_rule (
     PRIMARY KEY (id),
     UNIQUE KEY uk_fee_item (item)
 ) ENGINE=InnoDB COMMENT='学分收费规则';
+
+-- ---------------------------------------------------------------------
+-- 10. 公共信息：通知与留言
+--
+-- 通知是"教务发、大家看"，留言是"学生问、教务答"。
+-- 两张表分开而不是合成一张：它们的生命周期完全不同（通知发布即定稿，
+-- 留言要等回复、还要能追问），合在一起只会到处判类型。
+-- ---------------------------------------------------------------------
+CREATE TABLE notice (
+    id           BIGINT       NOT NULL AUTO_INCREMENT,
+    title        VARCHAR(120) NOT NULL,
+    content      TEXT         NOT NULL,
+    publisher    VARCHAR(50)  NULL,
+    target_role  VARCHAR(20)  NULL COMMENT '空=全员；也可只发给某个角色',
+    pinned       TINYINT      NOT NULL DEFAULT 0,
+    published_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_notice_time (published_at)
+) ENGINE=InnoDB COMMENT='通知中心';
+
+CREATE TABLE student_message (
+    id          BIGINT        NOT NULL AUTO_INCREMENT,
+    student_id  BIGINT        NOT NULL,
+    content     VARCHAR(1000) NOT NULL,
+    reply       VARCHAR(1000) NULL,
+    replied_by  VARCHAR(50)   NULL,
+    replied_at  DATETIME      NULL,
+    created_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_msg_student (student_id, created_at)
+) ENGINE=InnoDB COMMENT='学生留言与回复';
+
+-- ---------------------------------------------------------------------
+-- 11. 教材订购
+--
+-- 教材挂在教学班上（同一门课不同老师用的教材可能不同），
+-- 订购记录按"学生 × 教材"唯一，重复点只会更新而不是多出一条。
+-- ---------------------------------------------------------------------
+CREATE TABLE textbook (
+    id                BIGINT       NOT NULL AUTO_INCREMENT,
+    teaching_class_id BIGINT       NOT NULL,
+    title             VARCHAR(120) NOT NULL,
+    author            VARCHAR(60)  NULL,
+    publisher         VARCHAR(60)  NULL,
+    isbn              VARCHAR(30)  NULL,
+    price             DECIMAL(7,2) NULL,
+    note              VARCHAR(200) NULL,
+    PRIMARY KEY (id),
+    KEY idx_textbook_tc (teaching_class_id)
+) ENGINE=InnoDB COMMENT='教材';
+
+CREATE TABLE textbook_order (
+    id          BIGINT      NOT NULL AUTO_INCREMENT,
+    textbook_id BIGINT      NOT NULL,
+    student_id  BIGINT      NOT NULL,
+    status      VARCHAR(20) NOT NULL DEFAULT '已订购',
+    ordered_at  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_textbook_order (textbook_id, student_id)
+) ENGINE=InnoDB COMMENT='教材订购记录';
+
+-- ---------------------------------------------------------------------
+-- 12. 成绩构成（平时/期中/期末）
+--
+-- 总评成绩仍然是 enrollment.score 那一个数，这张表只解释"这个数是怎么来的"。
+-- 不把分项塞进 enrollment：一门课的分项数量会变（有的课没有期中），
+-- 塞进去就得反复加列。
+-- ---------------------------------------------------------------------
+CREATE TABLE grade_component (
+    id            BIGINT       NOT NULL AUTO_INCREMENT,
+    enrollment_id BIGINT       NOT NULL,
+    item          VARCHAR(20)  NOT NULL COMMENT '平时/期中/期末',
+    weight        DECIMAL(5,2) NULL COMMENT '占比百分比，如 30',
+    score         DECIMAL(5,1) NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_grade_component (enrollment_id, item)
+) ENGINE=InnoDB COMMENT='成绩构成';

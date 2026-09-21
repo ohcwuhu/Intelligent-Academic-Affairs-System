@@ -269,6 +269,74 @@ export interface AssistantAnswer {
   durationMs: number
 }
 
+export interface NoticeRow {
+  id: number
+  title: string
+  content: string
+  publisher: string | null
+  targetRole: string | null
+  pinned: boolean
+  publishedAt: string | null
+}
+
+export interface MessageRow {
+  id: number
+  studentNo: string | null
+  studentName: string | null
+  content: string
+  reply: string | null
+  repliedBy: string | null
+  repliedAt: string | null
+  createdAt: string | null
+}
+
+export interface TextbookRow {
+  textbookId: number
+  teachingClassId: number
+  teachingClassCode: string | null
+  courseName: string | null
+  courseCode: string | null
+  title: string
+  author: string | null
+  publisher: string | null
+  isbn: string | null
+  price: number | null
+  note: string | null
+  ordered: boolean
+}
+
+export interface MyTextbooks {
+  rows: TextbookRow[]
+  orderedCount: number
+  orderedAmount: number
+  totalAmount: number
+}
+
+export interface GradeComponent {
+  id: number | null
+  enrollmentId: number
+  item: string
+  weight: number | null
+  score: number | null
+}
+
+export interface StudentComponents {
+  enrollmentId: number
+  studentNo: string | null
+  studentName: string | null
+  totalScore: number | null
+  items: GradeComponent[]
+}
+
+export interface CourseComponents {
+  courseCode: string | null
+  courseName: string | null
+  termName: string | null
+  totalScore: number | null
+  scoreStatus: string | null
+  items: GradeComponent[]
+}
+
 export interface FeeRule {
   id: number
   item: string

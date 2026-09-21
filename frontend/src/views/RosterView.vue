@@ -9,8 +9,8 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ApiError } from '@/api/client'
-import { gradeApi, teachingClassApi } from '@/api'
-import type { RosterItem, TeachingClassVO } from '@/api/types'
+import { gradeApi, gradeComponentApi, teachingClassApi } from '@/api'
+import type { GradeComponent, RosterItem, StudentComponents, TeachingClassVO } from '@/api/types'
 import { creditText, gpaText } from '@/utils/format'
 import { toast } from '@/components/useToast'
 import Plate from '@/components/Plate.vue'
@@ -28,6 +28,12 @@ const drafts = reactive<Record<number, string>>({})
 const state = ref<'loading' | 'ready' | 'empty' | 'error'>('loading')
 const errorDetail = ref('')
 const saving = ref(false)
+// 分项成绩：平时/期中/期末。总评仍是上面那个分数，这里解释它怎么来的。
+const COMPONENT_ITEMS = ['平时', '期中', '期末']
+const components = ref<Map<number, GradeComponent[]>>(new Map())
+const editing = ref<RosterItem | null>(null)
+const draftComponents = ref<GradeComponent[]>([])
+const savingComponents = ref(false)
 
 async function load() {
   state.value = 'loading'
@@ -44,11 +50,48 @@ async function load() {
       drafts[item.enrollmentId] = item.score == null ? '' : String(item.score)
     }
     state.value = r.length ? 'ready' : 'empty'
+    const byClass = await gradeComponentApi.byClass(classId).catch(() => [] as StudentComponents[])
+    components.value = new Map(byClass.map((s) => [s.enrollmentId, s.items]))
   } catch (e) {
     state.value = 'error'
     errorDetail.value = e instanceof ApiError ? e.message : '名单加载失败'
   }
 }
+
+function openComponents(row: RosterItem) {
+  editing.value = row
+  const existing = components.value.get(row.enrollmentId) ?? []
+  draftComponents.value = COMPONENT_ITEMS.map((item) => {
+    const hit = existing.find((c) => c.item === item)
+    return {
+      id: hit?.id ?? null,
+      enrollmentId: row.enrollmentId,
+      item,
+      weight: hit?.weight ?? null,
+      score: hit?.score ?? null,
+    }
+  })
+}
+
+async function saveComponents() {
+  savingComponents.value = true
+  try {
+    const items = draftComponents.value.filter((c) => c.score != null || c.weight != null)
+    const n = await gradeComponentApi.save(items)
+    toast(`已保存 ${n} 项分项成绩`, 'ok')
+    editing.value = null
+    await load()
+  } catch (e) {
+    toast(e instanceof ApiError ? e.message : '保存失败', 'bad')
+  } finally {
+    savingComponents.value = false
+  }
+}
+
+/** 权重合计：不强制 100（各课口径不同），只显示出来提醒 */
+const weightSum = computed(() =>
+  draftComponents.value.reduce((s, c) => s + (c.weight ?? 0), 0),
+)
 
 onMounted(load)
 
@@ -113,6 +156,7 @@ const columns: Column[] = [
   { key: 'name', label: '姓名', width: '110px' },
   { key: 'clazz', label: '班级' },
   { key: 'major', label: '专业' },
+  { key: 'component', label: '分项', width: '110px' },
   { key: 'score', label: '成绩', width: '110px', align: 'right' },
   { key: 'gp', label: '绩点', width: '80px', align: 'right' },
   { key: 'pass', label: '是否通过', width: '90px' },
@@ -162,6 +206,11 @@ const columns: Column[] = [
           <td>{{ r.studentName }}</td>
           <td>{{ r.clazzName }}</td>
           <td>{{ r.majorName }}</td>
+          <td>
+            <Btn variant="quiet" @click="openComponents(r)">
+              {{ components.get(r.enrollmentId)?.length ? '分项成绩' : '录分项' }}
+            </Btn>
+          </td>
           <td class="num num-end">
             <input
               v-model="drafts[r.enrollmentId]"
@@ -183,9 +232,93 @@ const columns: Column[] = [
       </DataTable>
     </StateHost>
   </Plate>
+
+  <div v-if="editing" class="drawer" role="dialog" aria-modal="true">
+    <div class="drawer__panel">
+      <header class="drawer__head">
+        <p class="drawer__title">
+          {{ editing.studentName }}（{{ editing.studentNo }}）的分项成绩
+        </p>
+        <Btn variant="quiet" @click="editing = null">关闭</Btn>
+      </header>
+      <p class="drawer__hint">
+        总评成绩仍是名单里那一个数；这里解释它是怎么来的。
+        权重合计当前为 <span class="num">{{ weightSum }}</span>%（不同课程口径不同，不强制等于 100）。
+      </p>
+      <table class="items">
+        <thead>
+          <tr><th>项目</th><th>权重 %</th><th>分数</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="c in draftComponents" :key="c.item">
+            <td>{{ c.item }}</td>
+            <td><input v-model.number="c.weight" class="num" inputmode="decimal" /></td>
+            <td><input v-model.number="c.score" class="num" inputmode="decimal" /></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="drawer__act">
+        <Btn variant="solid" :loading="savingComponents" @click="saveComponents">保存分项</Btn>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
+.drawer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  background: rgba(19, 22, 25, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s-6);
+}
+.drawer__panel {
+  width: min(520px, 100%);
+  background: var(--face-raised);
+  border: 1px solid var(--line-strong);
+  padding: var(--s-4);
+}
+.drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+}
+.drawer__title {
+  font-weight: 600;
+}
+.drawer__hint {
+  font-size: var(--t-xs);
+  color: var(--ink-muted);
+  margin-bottom: var(--s-3);
+}
+.items {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--t-sm);
+}
+.items th,
+.items td {
+  border-bottom: 1px solid var(--line);
+  padding: var(--s-1) var(--s-2);
+  text-align: left;
+}
+.items input {
+  width: 90px;
+  height: 28px;
+  padding: 0 var(--s-2);
+  border: 1px solid var(--line-strong);
+  background: var(--face);
+}
+.drawer__act {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--s-3);
+}
 .tally {
   display: flex;
   gap: var(--s-6);

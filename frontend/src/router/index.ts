@@ -67,6 +67,28 @@ export const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/info',
+    name: 'info',
+    component: () => import('@/views/InfoView.vue'),
+    meta: {
+      title: '通知与留言',
+      nav: true,
+      group: '公共信息',
+      roles: ['STUDENT', 'TEACHER', 'ACADEMIC', 'ADMIN'],
+    },
+  },
+  {
+    path: '/textbooks',
+    name: 'textbooks',
+    component: () => import('@/views/TextbooksView.vue'),
+    meta: {
+      title: '教材订购',
+      nav: true,
+      group: '学业',
+      roles: ['STUDENT', 'ACADEMIC', 'ADMIN'],
+    },
+  },
+  {
     path: '/me/grades',
     name: 'my-grades',
     component: () => import('@/views/GradesView.vue'),

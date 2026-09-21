@@ -942,6 +942,161 @@ await check('专业课程表按专业筛选', async () => {
 
 // ---------------------------------------------------------------- 批量导入
 // ---------------------------------------------------------------- 培养计划与毕业审核
+// ---------------------------------------------------------------- 档 2：收费 / 通知留言 / 教材 / 成绩构成
+await check('学分收费能算出应缴金额与依据', async () => {
+  await logout(page)
+  await login(page, '2021002')
+  await gotoHash('/fee')
+  await settleContent(page)
+  await assertNoError(page, '学分收费页')
+  const body = await text(page)
+  assert(/本学期应缴/.test(body) && /480/.test(body), `没有算出应缴金额：${body.slice(0, 200)}`)
+  assert(/重新修读/.test(body), '没有写清按哪个项目收费')
+  assert(/演示数据|演示标准/.test(body), '没有标注单价是演示数据')
+  await shot(page, '28-fee')
+  return '480 元 = 4 学分 × 120 元'
+})
+
+await check('通知能看，学生留言能被教务回复', async () => {
+  const question = `我的重修缴费在哪里交（验收 ${Date.now() % 100000}）`
+  await gotoHash('/info')
+  await settleContent(page)
+  await assertNoError(page, '通知与留言页')
+  const body = await text(page)
+  assert(/置顶/.test(body) && /重新修读/.test(body), `没有看到置顶通知：${body.slice(0, 200)}`)
+
+  await page.fill('#ask', question)
+  await page.click('button:has-text("提交")')
+  await page.waitForTimeout(1500)
+  assert((await text(page)).includes(question), '留言没有出现在列表里')
+
+  await logout(page)
+  await login(page, 'jw001')
+  await gotoHash('/info')
+  await settleContent(page)
+  const row = page.locator('.message', { hasText: question }).first()
+  assert(await row.count(), '教务看不到学生留言')
+  page.once('dialog', (d) => d.accept('在「学分收费」页查看金额，缴费到行政楼一楼财务窗口'))
+  await row.locator('button:has-text("回复")').click()
+  await page.waitForTimeout(1500)
+
+  await logout(page)
+  await login(page, '2021002')
+  await gotoHash('/info')
+  await settleContent(page)
+  const after = await text(page)
+  assert(/教务处回复/.test(after) && /财务窗口/.test(after), '学生看不到回复')
+  await shot(page, '29-info')
+  return '学生提问 → 教务回复 → 学生可见'
+})
+
+await check('教材能按本学期课程看到并订购', async () => {
+  await logout(page)
+  await login(page, '2022001')
+  await gotoHash('/textbooks')
+  await settleContent(page)
+  await assertNoError(page, '教材订购页')
+  const body = await text(page)
+  assert(/数据结构（C语言版）/.test(body), `没有列出本学期教材：${body.slice(0, 200)}`)
+  const before = await page.locator('button:has-text("订购")').count()
+  assert(before > 0, '没有可订购的教材')
+  await page.locator('button:has-text("订购")').first().click()
+  await page.waitForTimeout(1500)
+  const after = await text(page)
+  assert(/已订 1 本/.test(after), `订购后金额小计没有变化：${after.slice(0, 160)}`)
+  // 再点一次是取消，不该多出一条记录
+  await page.locator('button:has-text("取消订购")').first().click()
+  await page.waitForTimeout(1500)
+  assert(/已订 0 本/.test(await text(page)), '取消订购没有生效')
+  return '订购与取消都闭环'
+})
+
+await check('教师录分项成绩，学生能看到构成', async () => {
+  await logout(page)
+  await login(page, 't1001')
+  await gotoHash('/teach/classes/2')
+  await settleContent(page)
+  await assertNoError(page, '名单页')
+  const row = page.locator('tr', { hasText: '2022001' }).first()
+  assert(await row.count(), '名单里没有 2022001')
+  await row.locator('button:has-text("分项")').click()
+  await page.waitForTimeout(800)
+  const drawer = page.locator('.drawer__panel')
+  assert(await drawer.count(), '分项成绩抽屉没有打开')
+  // 期末分数改成 91，权重 50
+  const inputs = drawer.locator('tbody tr').nth(2).locator('input')
+  await inputs.nth(0).fill('50')
+  await inputs.nth(1).fill('91')
+  await page.click('button:has-text("保存分项")')
+  await page.waitForTimeout(1800)
+  assert(/已保存/.test(await page.locator('.toast').last().innerText()), '分项成绩没有保存')
+
+  await logout(page)
+  await login(page, '2022001')
+  await gotoHash('/me/grades')
+  await settleContent(page)
+  const body = await text(page)
+  assert(/成绩构成/.test(body), '成绩页没有成绩构成列')
+  assert(/平时/.test(body) && /期末/.test(body), `没有显示分项：${body.slice(0, 200)}`)
+  await shot(page, '30-grade-components')
+  return '分项成绩已同步到学生端'
+})
+
+await check('证明打印：审批通过后能出可打印的证明', async () => {
+  await logout(page)
+  await login(page, '2022001')
+  await gotoHash('/me/applications')
+  await settleContent(page)
+  await page.selectOption('#type', 'CERTIFICATE')
+  await page.waitForTimeout(500)
+  await page.fill('#cert', '成绩证明')
+  await page.fill('#reason', '申请出国交流需要教务处出具成绩证明')
+  await page.click('button:has-text("提交申请")')
+  await page.waitForTimeout(1800)
+  assert(/已提交/.test(await page.locator('.toast').last().innerText()), '证明申请没有提交成功')
+
+  await logout(page)
+  await login(page, 'jw001')
+  await gotoHash('/admin/applications')
+  await settleContent(page)
+  const row = page.locator('tbody tr', { hasText: '成绩证明' }).first()
+  assert(await row.count(), '教务看不到这张证明申请')
+  page.once('dialog', (d) => d.accept('已核对，同意出具'))
+  await row.locator('button:has-text("通过")').click()
+  await page.waitForTimeout(1500)
+
+  await logout(page)
+  await login(page, '2022001')
+  await gotoHash('/me/applications')
+  await settleContent(page)
+  const certRow = page.locator('tbody tr', { hasText: '成绩证明' }).first()
+  await certRow.locator('button:has-text("查看证明")').click()
+  await page.waitForTimeout(1200)
+  const cert = await text(page)
+  assert(/福州大学至诚学院/.test(cert) && /成绩证明/.test(cert), `证明没有渲染：${cert.slice(0, 160)}`)
+  assert(/盖章/.test(cert), '证明上没有写"需盖章"')
+  assert(/已获学分/.test(cert), '成绩证明没有带学分汇总')
+  await shot(page, '31-certificate')
+  return '证明可出，且注明需盖章'
+})
+
+await check('教室使用情况能看到占用与空闲', async () => {
+  await gotoHash('/classrooms')
+  await settleContent(page)
+  await assertNoError(page, '教室使用情况页')
+  const body = await text(page)
+  assert(/占用中/.test(body) && /空闲/.test(body), `没有给出占用与空闲：${body.slice(0, 200)}`)
+  // 换到周三 3-4 节：种子数据里有两门课排在这个时段
+  await page.selectOption('#wd', '3')
+  await page.selectOption('#ss', '3')
+  await page.selectOption('#es', '4')
+  await page.waitForTimeout(1200)
+  const after = await text(page)
+  assert(/数据结构|计算机网络/.test(after), `周三 3-4 节没有显示占用的课：${after.slice(0, 200)}`)
+  await shot(page, '32-classrooms')
+  return '占用与空闲都正确'
+})
+
 await check('培养方案把课程写进课程库，且课程码唯一', async () => {
   // 方案里没有课程代码，所以系统给新建课程编号（PL + 流水号）；
   // 能对上已有课程的（如"算法与数据结构"→"数据结构"）复用原编号，不重复建课
@@ -1104,7 +1259,10 @@ await check('改对之后能入库，重复导入不翻倍', async () => {
   await page.click('button:has-text("确认导入")')
   await page.waitForTimeout(3000)
   const afterFirst = await countBy()
-  assert(afterFirst === before + 3, `第一次导入后课程数不对：${before} → ${afterFirst}`)
+  // 这几门课可能在前几轮验收里已经导过：幂等的表现是"数量不减少、也不重复"，
+  // 所以判据放在"至少 3 门"与"第二次导入后数量不变"上，而不是死等 +3
+  assert(afterFirst >= 3, `第一次导入后课程数不对：${before} → ${afterFirst}`)
+  assert(afterFirst === Math.max(before, 3), `第一次导入后课程数异常：${before} → ${afterFirst}`)
 
   // 同一份文件再导一次：按课程代码更新，不该多出三条
   await page.setInputFiles('#ifile', goodPath)
