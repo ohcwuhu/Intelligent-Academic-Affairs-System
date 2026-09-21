@@ -23,6 +23,9 @@ public class TeachingClass {
     private Long termId;
     private Integer capacity;
     private Integer enrolled;
+    /** 面向专业与年级：专业课表按这两个字段筛，空表示面向全校/不限年级。 */
+    private Long majorId;
+    private Integer grade;
     private Integer weekday;
     private Integer startSection;
     private Integer endSection;

@@ -29,6 +29,7 @@ public class ScheduleController {
 
     private final EnrollmentService enrollmentService;
     private final TeachingClassService teachingClassService;
+    private final ScheduleService scheduleService;
     /** 我的课表。termId 为空时取当前学期。 */
     @GetMapping("/my")
     public R<ScheduleDtos.Timetable> my(@RequestParam(required = false) Long termId) {
@@ -57,5 +58,21 @@ public class ScheduleController {
             throw BizException.forbidden("教务人员请使用教学班列表查询课表");
         }
         return R.ok(new ScheduleDtos.Timetable(term, entries));
+    }
+
+    /**
+     * 专业课表：某专业某年级该学期开出的课。
+     *
+     * <p>按教学班上的"面向专业/年级"筛，而不是按谁选了课反推——
+     * 反推会把"别的专业来选修"的课也算进来，也会漏掉还没人选的开课。
+     * 专业与年级留空表示看全校课表。
+     */
+    @GetMapping("/major")
+    public R<ScheduleDtos.MajorTimetable> major(
+            @RequestParam(required = false) Long majorId,
+            @RequestParam(required = false) Integer grade,
+            @RequestParam(required = false) Long termId) {
+        UserContext.require();
+        return R.ok(scheduleService.majorTimetable(majorId, grade, termId));
     }
 }

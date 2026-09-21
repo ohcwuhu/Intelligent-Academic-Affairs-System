@@ -34,6 +34,17 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: '选课', nav: true, group: '学业', roles: ['STUDENT'] },
   },
   {
+    path: '/major/timetable',
+    name: 'major-timetable',
+    component: () => import('@/views/MajorTimetableView.vue'),
+    meta: {
+      title: '专业课程表',
+      nav: true,
+      group: '学业',
+      roles: ['STUDENT', 'TEACHER', 'ACADEMIC', 'ADMIN'],
+    },
+  },
+  {
     path: '/me/grades',
     name: 'my-grades',
     component: () => import('@/views/GradesView.vue'),
@@ -50,6 +61,12 @@ export const routes: RouteRecordRaw[] = [
     name: 'my-applications',
     component: () => import('@/views/MyApplicationsView.vue'),
     meta: { title: '我的申请', nav: true, group: '办事', roles: ['STUDENT'] },
+  },
+  {
+    path: '/me/exams',
+    name: 'my-exams',
+    component: () => import('@/views/ExamsView.vue'),
+    meta: { title: '我的考试', nav: true, group: '学业', roles: ['STUDENT'] },
   },
   {
     path: '/teach/classes',
@@ -104,6 +121,12 @@ export const routes: RouteRecordRaw[] = [
     name: 'admin-applications',
     component: () => import('@/views/ApplicationReviewView.vue'),
     meta: { title: '申请审批', nav: true, group: '教务', roles: ['ACADEMIC', 'ADMIN'] },
+  },
+  {
+    path: '/admin/exams',
+    name: 'admin-exams',
+    component: () => import('@/views/ExamManageView.vue'),
+    meta: { title: '考试安排', nav: true, group: '教务', roles: ['ACADEMIC', 'ADMIN'] },
   },
   {
     path: '/admin/knowledge',

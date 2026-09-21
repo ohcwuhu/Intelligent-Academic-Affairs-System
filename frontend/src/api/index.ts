@@ -14,6 +14,8 @@ import type {
   Course,
   CreditSummary,
   ConflictItem,
+  ExamRow,
+  ExamSaveResult,
   FeedbackRow,
   GovernanceOverview,
   KnowledgeChunkDetail,
@@ -22,6 +24,7 @@ import type {
   KnowledgeStats,
   LoginResponse,
   Major,
+  MajorTimetable,
   MyCourse,
   PageResult,
   RosterItem,
@@ -73,6 +76,8 @@ export const gradeApi = {
 
 export const scheduleApi = {
   my: (termId?: number) => get<Timetable>('/schedule/my', { termId }),
+  major: (params: { majorId?: number; grade?: number; termId?: number }) =>
+    get<MajorTimetable>('/schedule/major', params),
 }
 
 export const studentApi = {
@@ -106,6 +111,15 @@ export const userApi = {
   resetPassword: (id: number, password: string) =>
     post<void>(`/user/${id}/password`, { password }),
   setStatus: (id: number, status: number) => post<void>(`/user/${id}/status`, {}, { status }),
+}
+
+export const examApi = {
+  /** 学生：我的考试（只看本人选课的教学班） */
+  my: (termId?: number) => get<ExamRow[]>('/exam/my', { termId }),
+  /** 教务看全部，教师只看本人任教教学班 */
+  list: (params: { termId?: number; teachingClassId?: number }) => get<ExamRow[]>('/exam', params),
+  save: (body: Record<string, unknown>) => post<ExamSaveResult>('/exam', body),
+  remove: (id: number) => del<void>(`/exam/${id}`),
 }
 
 export const applicationApi = {

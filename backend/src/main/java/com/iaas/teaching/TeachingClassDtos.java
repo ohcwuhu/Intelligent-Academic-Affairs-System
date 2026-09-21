@@ -15,6 +15,7 @@ public final class TeachingClassDtos {
             Long teacherId, String teacherName,
             Long termId, String termName,
             Integer capacity, Integer enrolled, Integer remaining,
+            Long majorId, String majorName, Integer grade,
             Integer weekday, Integer startSection, Integer endSection,
             Integer startWeek, Integer endWeek, String weekType,
             String classroom, String status, String timeText) {
@@ -24,7 +25,7 @@ public final class TeachingClassDtos {
             Long id, String code, Long courseId, Long teacherId, Long termId,
             Integer capacity, Integer weekday, Integer startSection, Integer endSection,
             Integer startWeek, Integer endWeek, String weekType,
-            String classroom, String status) {
+            String classroom, String status, Long majorId, Integer grade) {
     }
 
     /**

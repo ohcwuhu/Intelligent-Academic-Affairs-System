@@ -202,6 +202,16 @@ export interface Timetable {
   entries: TimetableEntry[]
 }
 
+export interface MajorTimetable {
+  termId: number
+  termName: string | null
+  majorId: number | null
+  majorName: string | null
+  grade: number | null
+  courseCount: number
+  entries: TimetableEntry[]
+}
+
 export interface ScheduleConflict {
   type: 'TEACHER' | 'CLASSROOM'
   conflictWith: string
@@ -257,6 +267,32 @@ export interface AssistantAnswer {
   data: Record<string, unknown> | null
   conversationId: number | null
   durationMs: number
+}
+
+export interface ExamRow {
+  id: number
+  teachingClassId: number
+  teachingClassCode: string | null
+  courseCode: string | null
+  courseName: string | null
+  teacherName: string | null
+  termId: number | null
+  termName: string | null
+  examType: string
+  examDate: string
+  startTime: string
+  endTime: string
+  timeText: string
+  classroom: string | null
+  seatNo: string | null
+  note: string | null
+  daysAhead: number | null
+  conflictWith: string[]
+}
+
+export interface ExamSaveResult {
+  id: number
+  conflicts: { kind: string; message: string }[]
 }
 
 export interface ApplicationRow {

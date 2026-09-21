@@ -24,4 +24,16 @@ public final class ScheduleDtos {
 
     public record Timetable(Long termId, List<TimetableEntry> entries) {
     }
+
+    /**
+     * 专业课表：某个专业某个年级这一学期开出的课。
+     *
+     * <p>与"我的课表"的区别在数据来源：那是我选了什么，这是这个专业开了什么，
+     * 所以它同时也是选课前的参考。
+     */
+    public record MajorTimetable(
+            Long termId, String termName,
+            Long majorId, String majorName, Integer grade,
+            int courseCount, List<TimetableEntry> entries) {
+    }
 }

@@ -10,12 +10,13 @@ import { computed, onMounted, ref } from 'vue'
 import { ApiError } from '@/api/client'
 import { enrollmentApi, scheduleApi } from '@/api'
 import type { ConflictItem, CreditSummary, TimetableEntry } from '@/api/types'
-import { creditText, gpaText, teachingWeek, termWeekCount, weekdayText } from '@/utils/format'
+import { creditText, gpaText, teachingWeek, termWeekCount } from '@/utils/format'
 import { useAuthStore } from '@/stores/auth'
 import { useCurrentTerm } from '@/components/useTerm'
 import Plate from '@/components/Plate.vue'
 import DataTable from '@/components/DataTable.vue'
 import StateHost from '@/components/StateHost.vue'
+import TimetableGrid from '@/components/TimetableGrid.vue'
 import type { Column } from '@/components/DataTable.vue'
 
 const auth = useAuthStore()
@@ -26,10 +27,6 @@ const conflicts = ref<ConflictItem[]>([])
 const summary = ref<CreditSummary | null>(null)
 const state = ref<'loading' | 'ready' | 'empty' | 'error'>('loading')
 const errorDetail = ref('')
-
-const DAYS = [1, 2, 3, 4, 5, 6, 7]
-const SECTIONS = 12
-const ROW_H = 46
 
 async function load() {
   state.value = 'loading'
@@ -51,51 +48,6 @@ async function load() {
 
 onMounted(load)
 
-interface Placed extends TimetableEntry {
-  lane: number
-  lanes: number
-}
-
-/** 把一天的课按重叠关系分组，再在组内分配泳道。 */
-function layoutDay(day: number): Placed[] {
-  const list = entries.value
-    .filter((e) => e.weekday === day)
-    .slice()
-    .sort((a, b) => a.startSection - b.startSection || a.endSection - b.endSection)
-
-  const placed: Placed[] = []
-  let group: TimetableEntry[] = []
-  let groupEnd = -1
-
-  const settle = () => {
-    if (!group.length) return
-    const laneEnds: number[] = []
-    const assigned = group.map((e) => {
-      let lane = laneEnds.findIndex((end) => end < e.startSection)
-      if (lane === -1) {
-        laneEnds.push(e.endSection)
-        lane = laneEnds.length - 1
-      } else {
-        laneEnds[lane] = e.endSection
-      }
-      return { entry: e, lane }
-    })
-    const lanes = laneEnds.length
-    for (const a of assigned) placed.push({ ...a.entry, lane: a.lane, lanes })
-    group = []
-    groupEnd = -1
-  }
-
-  for (const e of list) {
-    if (group.length && e.startSection > groupEnd) settle()
-    group.push(e)
-    groupEnd = Math.max(groupEnd, e.endSection)
-  }
-  settle()
-  return placed
-}
-
-const grid = computed(() => DAYS.map((d) => ({ day: d, items: layoutDay(d) })))
 const totalCredit = computed(() => entries.value.reduce((s, e) => s + (e.credit ?? 0), 0))
 const week = computed(() => teachingWeek(currentTerm.value))
 const weekCount = computed(() => termWeekCount(currentTerm.value))
@@ -109,7 +61,6 @@ const listColumns: Column[] = [
   { key: 'credit', label: '学分', width: '70px', align: 'right' },
 ]
 
-const todayWeekday = new Date().getDay() === 0 ? 7 : new Date().getDay()
 </script>
 
 <template>
@@ -182,44 +133,7 @@ const todayWeekday = new Date().getDay() === 0 ? 7 : new Date().getDay()
         </ul>
       </div>
 
-      <div class="grid" :style="{ '--row-h': `${ROW_H}px` }">
-        <div class="grid__corner"></div>
-        <div
-          v-for="d in DAYS"
-          :key="`h${d}`"
-          class="grid__head"
-          :class="{ 'is-today': d === todayWeekday }"
-        >
-          {{ weekdayText(d) }}
-        </div>
-
-        <div class="grid__axis">
-          <div v-for="s in SECTIONS" :key="`s${s}`" class="grid__axis-cell num">{{ s }}</div>
-        </div>
-
-        <div v-for="col in grid" :key="`c${col.day}`" class="grid__day">
-          <div v-for="s in SECTIONS" :key="`r${s}`" class="grid__row"></div>
-          <article
-            v-for="item in col.items"
-            :key="`${item.courseCode}-${item.className}-${item.startSection}`"
-            class="block"
-            :style="{
-              top: `${(item.startSection - 1) * ROW_H}px`,
-              height: `${(item.endSection - item.startSection + 1) * ROW_H - 6}px`,
-              left: `calc(${(item.lane / item.lanes) * 100}% + 2px)`,
-              width: `calc(${100 / item.lanes}% - 4px)`,
-            }"
-          >
-            <p class="block__code">{{ item.courseCode }}</p>
-            <p class="block__name">{{ item.courseName }}</p>
-            <p class="block__meta">
-              {{ item.classroom || '地点待定' }}
-              <template v-if="item.teacherName">，{{ item.teacherName }}</template>
-              <template v-else-if="item.className">，{{ item.className }}</template>
-            </p>
-          </article>
-        </div>
-      </div>
+      <TimetableGrid :entries="entries" />
 
       <div class="listing">
         <p class="listing__title">按课程列出</p>

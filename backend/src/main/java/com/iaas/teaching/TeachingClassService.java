@@ -5,6 +5,8 @@ import com.iaas.common.BizException;
 import com.iaas.course.entity.Course;
 import com.iaas.course.mapper.CourseMapper;
 import com.iaas.enrollment.TimeConflictChecker;
+import com.iaas.system.entity.Major;
+import com.iaas.system.mapper.MajorMapper;
 import com.iaas.system.entity.Term;
 import com.iaas.system.mapper.TermMapper;
 import com.iaas.teacher.entity.Teacher;
@@ -39,6 +41,7 @@ public class TeachingClassService {
     private final CourseMapper courseMapper;
     private final TeacherMapper teacherMapper;
     private final TermMapper termMapper;
+    private final MajorMapper majorMapper;
     public List<TeachingClassDtos.TeachingClassVO> list(Long termId, Long courseId,
                                                         Long teacherId, boolean onlyOpen) {
         var query = Wrappers.<TeachingClass>lambdaQuery()
@@ -97,6 +100,8 @@ public class TeachingClassService {
         entity.setWeekType(req.weekType() == null ? TimeConflictChecker.WEEK_ALL : req.weekType());
         entity.setClassroom(req.classroom());
         entity.setStatus(req.status() == null ? OPEN : req.status());
+        entity.setMajorId(req.majorId());
+        entity.setGrade(req.grade());
 
         if (req.id() == null) {
             if (entity.getCode() == null || entity.getCode().isBlank()) {
@@ -180,6 +185,12 @@ public class TeachingClassService {
                 list.stream().map(TeachingClass::getTeacherId).distinct().toList()), Teacher::getId);
         Map<Long, Term> termMap = loadMap(termMapper.selectBatchIds(
                 list.stream().map(TeachingClass::getTermId).distinct().toList()), Term::getId);
+        // 面向专业一次批量查，避免每行回查一次
+        List<Long> majorIds = list.stream().map(TeachingClass::getMajorId)
+                .filter(Objects::nonNull).distinct().toList();
+        Map<Long, Major> majorMap = majorIds.isEmpty()
+                ? Map.of()
+                : loadMap(majorMapper.selectBatchIds(majorIds), Major::getId);
 
         List<TeachingClassDtos.TeachingClassVO> result = new ArrayList<>();
         for (TeachingClass tc : list) {
@@ -197,6 +208,10 @@ public class TeachingClassService {
                     tc.getTeacherId(), t == null ? null : t.getName(),
                     tc.getTermId(), term == null ? null : term.getName(),
                     tc.getCapacity(), tc.getEnrolled(), remaining,
+                    tc.getMajorId(), tc.getMajorId() == null ? null
+                            : (majorMap.get(tc.getMajorId()) == null ? null
+                                    : majorMap.get(tc.getMajorId()).getName()),
+                    tc.getGrade(),
                     tc.getWeekday(), tc.getStartSection(), tc.getEndSection(),
                     tc.getStartWeek(), tc.getEndWeek(), tc.getWeekType(),
                     tc.getClassroom(), tc.getStatus(),
