@@ -137,11 +137,18 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: '教学班名单', roles: ['TEACHER', 'ACADEMIC', 'ADMIN'] },
   },
   {
+    path: '/admin/workbench',
+    name: 'admin-workbench',
+    component: () => import('@/views/WorkbenchView.vue'),
+    meta: { title: '工作台', nav: true, group: '教务', roles: ['ACADEMIC', 'ADMIN'] },
+  },
+  {
     path: '/admin/students',
     name: 'admin-students',
     component: () => import('@/views/StudentsView.vue'),
     meta: { title: '学生档案', nav: true, group: '教务', roles: ['ACADEMIC', 'ADMIN'] },
   },
+
   {
     path: '/admin/teachers',
     name: 'admin-teachers',
@@ -216,7 +223,8 @@ export const routes: RouteRecordRaw[] = [
 export function homeForRole(role: Role | null): string {
   if (role === 'STUDENT') return '/me/timetable'
   if (role === 'TEACHER') return '/teach/classes'
-  return '/admin/students'
+  // 教务与管理员落在工作台：先进去看今天要办什么，而不是先落到某个档案列表
+  return '/admin/workbench'
 }
 
 const router = createRouter({

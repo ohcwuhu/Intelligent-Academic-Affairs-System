@@ -269,6 +269,36 @@ export interface AssistantAnswer {
   durationMs: number
 }
 
+export interface WorkbenchTodo {
+  kind: string
+  id: number
+  title: string
+  detail: string
+  createdAt: string | null
+}
+
+export interface Workbench {
+  pendingApplications: number
+  waitingMessages: number
+  pendingFeedback: number
+  pendingGaps: number
+  askToday: number
+  blockedToday: number
+  injectionToday: number
+  avgDurationMs: number
+  effectiveDocuments: number
+  chunks: number
+  expiringDocuments: number
+  students: number
+  teachers: number
+  courses: number
+  teachingClasses: number
+  programs: number
+  termName: string | null
+  todos: WorkbenchTodo[]
+  waitingList: MessageRow[]
+}
+
 export interface PlanHint {
   courseId: number
   inPlan: boolean

@@ -419,18 +419,46 @@ await check('教师查别人教学班的名单被后端拒绝', async () => {
 })
 
 // ---------------------------------------------------------------- 教务
-await check('教务 jw001 登录后落在学生档案，列表非空', async () => {
+await check('教务 jw001 登录后落在工作台，数字与待办都在', async () => {
   await logout(page)
   await login(page, 'jw001')
-  assert(page.url().includes('/admin/students'), `落点不对：${page.url()}`)
-  await assertNoError(page, '学生档案页')
+  // 教务的一天是"先看今天要办什么"，所以着陆页是工作台而不是某个档案列表
+  assert(page.url().includes('/admin/workbench'), `落点不对：${page.url()}`)
+  await settleContent(page)
+  await assertNoError(page, '工作台')
   const body = await text(page)
-  assert(/2021|2022|2023/.test(body), '学生列表没有学号')
-  await shot(page, '09-academic-students')
-  return '档案可读'
+  assert(/今天要办的/.test(body), `没有待办区块：${body.slice(0, 200)}`)
+  assert(/待审申请/.test(body) && /待回复留言/.test(body) && /待处理反馈/.test(body), '待办数字不全')
+  assert(/今日问答质量/.test(body), '没有问答质量区块')
+  assert(/数据规模/.test(body) && /培养方案/.test(body), '没有数据规模区块')
+  assert(/去审批|去回复|去处理/.test(body), '待办数字没有可点的入口')
+  await shot(page, '09-academic-workbench')
+  return '工作台含待办、问答质量与数据规模'
+})
+
+await check('工作台的待审条目与申请审批页一致', async () => {
+  const fromWorkbench = await page.evaluate(async () => {
+    const token = localStorage.getItem('iaas.token')
+    const res = await fetch('/api/workbench', { headers: { Authorization: `Bearer ${token}` } })
+    return (await res.json()).data.pendingApplications
+  })
+  const fromApplications = await page.evaluate(async () => {
+    const token = localStorage.getItem('iaas.token')
+    const res = await fetch('/api/application?page=1&size=1&status=待审', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return (await res.json()).data.total
+  })
+  assert(
+    fromWorkbench === fromApplications,
+    `工作台与申请审批页的数字不一致：${fromWorkbench} vs ${fromApplications}`,
+  )
+  return `两处都是 ${fromWorkbench} 条`
 })
 
 await check('学生档案按学号检索命中', async () => {
+  await gotoHash('/admin/students')
+  await settleContent(page)
   const box = page.locator('input[type="search"], input[placeholder*="学号"], input[placeholder*="姓名"]').first()
   assert(await box.count(), '找不到检索框')
   await box.fill('2022001')
@@ -648,6 +676,63 @@ await check('账号停用后登不上，启用后恢复', async () => {
   const after = await page.locator('tr', { hasText: '2021002' }).first().innerText()
   assert(/启用/.test(after), `没有恢复启用：${after.replace(/\s+/g, ' ')}`)
   return '停用被拦住，启用后恢复'
+})
+
+// ---------------------------------------------------------------- 导出
+await check('教务能导出名册与课程库，内容带 BOM 与表头', async () => {
+  await logout(page)
+  await login(page, 'jw001')
+  const result = await page.evaluate(async () => {
+    const token = localStorage.getItem('iaas.token')
+    const out = {}
+    for (const type of ['students', 'courses', 'teaching-classes']) {
+      const res = await fetch(`/api/export/${type}`, { headers: { Authorization: `Bearer ${token}` } })
+      // 用字节读：fetch().text() 会把 UTF-8 BOM 吃掉，那样永远测不出"有没有 BOM"
+      const bytes = new Uint8Array(await res.arrayBuffer())
+      const text = new TextDecoder().decode(bytes)
+      out[type] = {
+        contentType: res.headers.get('content-type'),
+        disposition: res.headers.get('content-disposition'),
+        bom: bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf,
+        head: text.slice(0, 60).replace(/\r?\n/g, ' | '),
+        rows: text.trim().split(/\r?\n/).length,
+      }
+    }
+    return out
+  })
+  for (const [type, r] of Object.entries(result)) {
+    assert(/text\/csv/.test(r.contentType ?? ''), `${type} 类型不对：${r.contentType}`)
+    assert(r.bom, `${type} 没有 UTF-8 BOM，Excel 打开会乱码`)
+    assert(/UTF-8''/.test(r.disposition ?? ''), `${type} 文件名没有按 RFC 5987 编码`)
+    assert(r.rows > 1, `${type} 只有表头没有数据`)
+  }
+  assert(/学号/.test(result.students.head), `学生名册表头不对：${result.students.head}`)
+  assert(/课程代码/.test(result.courses.head), `课程库表头不对：${result.courses.head}`)
+  return `名册 ${result.students.rows - 1} 行 / 课程库 ${result.courses.rows - 1} 行 / 开课表 ${result['teaching-classes'].rows - 1} 行`
+})
+
+await check('学生可以导出自己的成绩，但导不了别人的档案', async () => {
+  await logout(page)
+  await login(page, '2022001')
+  const result = await page.evaluate(async () => {
+    const token = localStorage.getItem('iaas.token')
+    const mine = await fetch('/api/export/my-grades', { headers: { Authorization: `Bearer ${token}` } })
+    const mineText = await mine.text()
+    const denied = await fetch('/api/export/students', { headers: { Authorization: `Bearer ${token}` } })
+    const deniedType = denied.headers.get('content-type')
+    const deniedBody = await denied.json().catch(() => null)
+    return {
+      mineOk: /学期,课程代码/.test(mineText),
+      mineRows: mineText.trim().split(/\r?\n/).length,
+      deniedType,
+      deniedCode: deniedBody?.code,
+      deniedMessage: deniedBody?.message,
+    }
+  })
+  assert(result.mineOk && result.mineRows > 1, '学生导不出自己的成绩')
+  assert(/application\/json/.test(result.deniedType ?? ''), '越权导出应返回错误而不是文件')
+  assert(result.deniedCode === 403, `越权导出没有被拒：${result.deniedCode} ${result.deniedMessage}`)
+  return `本人成绩 ${result.mineRows - 1} 行；越权导出被拒（${result.deniedMessage}）`
 })
 
 await check('教师录成绩能保存', async () => {

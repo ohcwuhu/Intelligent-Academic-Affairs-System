@@ -33,30 +33,12 @@ public class GovernanceController {
     private final KnowledgeGapService gapService;
     private final FeedbackService feedbackService;
     private final AuditLogMapper auditMapper;
+    private final GovernanceOverviewService overviewService;
 
     @GetMapping("/overview")
     public R<GovernanceDtos.Overview> overview() {
         requireStaff();
-        LocalDateTime dayStart = LocalDate.now().atStartOfDay();
-        long askToday = auditMapper.selectCount(Wrappers.<AuditLog>lambdaQuery()
-                .eq(AuditLog::getEventType, "ASK")
-                .ge(AuditLog::getCreatedAt, dayStart));
-        long blockedToday = auditMapper.selectCount(Wrappers.<AuditLog>lambdaQuery()
-                .eq(AuditLog::getEventType, "ASK")
-                .eq(AuditLog::getBlocked, 1)
-                .ge(AuditLog::getCreatedAt, dayStart));
-        long injectionToday = auditMapper.selectCount(Wrappers.<AuditLog>lambdaQuery()
-                .eq(AuditLog::getEventType, "INJECTION")
-                .ge(AuditLog::getCreatedAt, dayStart));
-        List<AuditLog> recent = auditMapper.selectList(Wrappers.<AuditLog>lambdaQuery()
-                .eq(AuditLog::getEventType, "ASK")
-                .ge(AuditLog::getCreatedAt, dayStart));
-        double avg = recent.stream()
-                .filter(a -> a.getDurationMs() != null)
-                .mapToInt(AuditLog::getDurationMs).average().orElse(0);
-        return R.ok(new GovernanceDtos.Overview(
-                feedbackService.pendingCount(), gapService.pendingCount(),
-                askToday, blockedToday, injectionToday, Math.round(avg * 10) / 10.0));
+        return R.ok(overviewService.overview());
     }
 
     @GetMapping("/gaps")

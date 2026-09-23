@@ -34,6 +34,7 @@ import type {
   NoticeRow,
   PlanHint,
   StudentComponents,
+  Workbench,
   GovernanceOverview,
   KnowledgeChunkDetail,
   KnowledgeDocumentRow,
@@ -133,6 +134,11 @@ export const userApi = {
   changeMyPassword: (id: number, oldPassword: string, password: string) =>
     post<void>(`/user/${id}/password`, { password, oldPassword }),
   setStatus: (id: number, status: number) => post<void>(`/user/${id}/status`, {}, { status }),
+}
+
+export const workbenchApi = {
+  /** 教务工作台：待办、今日问答质量、数据规模 */
+  load: () => get<Workbench>('/workbench'),
 }
 
 export const infoApi = {
