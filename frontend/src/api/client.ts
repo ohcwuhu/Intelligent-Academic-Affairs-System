@@ -92,3 +92,44 @@ export function del<T>(url: string, params?: Record<string, unknown>) {
 export function postForm<T>(url: string, form: FormData, params?: Record<string, unknown>) {
   return unwrap<T>(http.post<ApiEnvelope<T>>(url, form, { params, timeout: 120000 }))
 }
+
+/**
+ * 下载 CSV。
+ *
+ * 不走 axios 的统一拆包：导出返回的是文件流，不是 {code,message,data}。
+ * 但后端出错时返回的又是那套 JSON（HTTP 仍是 200），所以这里要按 Content-Type 分开处理，
+ * 否则用户会下载到一个内容为报错信息的 .csv。
+ *
+ * 文件名从 Content-Disposition 的 filename* 取（后端按 RFC 5987 传中文）。
+ */
+export async function downloadCsv(
+  url: string,
+  params?: Record<string, unknown>,
+  fallbackName = 'export.csv',
+) {
+  const token = localStorage.getItem(TOKEN_KEY)
+  const query = new URLSearchParams()
+  Object.entries(params ?? {}).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') query.append(k, String(v))
+  })
+  const res = await fetch(`/api${url}${query.size ? `?${query}` : ''}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  const type = res.headers.get('content-type') ?? ''
+  if (type.includes('application/json')) {
+    const body = (await res.json()) as ApiEnvelope<unknown>
+    const err = new ApiError(body.code, body.message)
+    if (err.isUnauthorized) handleUnauthorized()
+    throw err
+  }
+  if (!res.ok) throw new ApiError(res.status, '导出失败')
+  const disposition = res.headers.get('content-disposition') ?? ''
+  const matched = /filename\*=UTF-8''([^;]+)/i.exec(disposition)
+  const name = matched ? decodeURIComponent(matched[1]) : fallbackName
+  const blob = await res.blob()
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = name
+  link.click()
+  URL.revokeObjectURL(link.href)
+}

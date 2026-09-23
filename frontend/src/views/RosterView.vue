@@ -10,6 +10,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ApiError } from '@/api/client'
 import { gradeApi, gradeComponentApi, teachingClassApi } from '@/api'
+import { downloadCsv } from '@/api/client'
 import type { GradeComponent, RosterItem, StudentComponents, TeachingClassVO } from '@/api/types'
 import { creditText, gpaText } from '@/utils/format'
 import { toast } from '@/components/useToast'
@@ -173,6 +174,12 @@ const columns: Column[] = [
     "
   >
     <template #actions>
+      <Btn
+        variant="quiet"
+        @click="() => downloadCsv(`/export/roster`, { id: classId }).then(() => toast('名单已导出', 'ok')).catch((e) => toast(e.message ?? '导出失败', 'bad'))"
+      >
+        导出名单
+      </Btn>
       <Btn variant="solid" :loading="saving" :disabled="!changedIds.length" @click="save">
         保存成绩
       </Btn>

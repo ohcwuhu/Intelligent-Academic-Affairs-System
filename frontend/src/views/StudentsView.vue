@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /** 学生档案维护。数据范围由服务端按角色限定。 */
 import { onMounted, reactive, ref } from 'vue'
-import { ApiError } from '@/api/client'
+import { ApiError, downloadCsv } from '@/api/client'
 import { basicApi, studentApi } from '@/api'
 import type { Clazz, StudentVO } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
@@ -111,6 +111,12 @@ async function remove(s: StudentVO) {
 <template>
   <Plate title="学生档案" :note="`共 ${total} 人`">
     <template #actions>
+      <Btn
+        variant="quiet"
+        @click="() => downloadCsv('/export/students', { keyword: filters.keyword }).then(() => toast('已导出当前筛选结果', 'ok')).catch((e) => toast(e.message ?? '导出失败', 'bad'))"
+      >
+        导出
+      </Btn>
       <Btn variant="solid" @click="startCreate">新增学生</Btn>
     </template>
 

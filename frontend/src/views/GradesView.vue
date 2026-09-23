@@ -8,8 +8,11 @@
 import { computed, onMounted, ref } from 'vue'
 import { ApiError } from '@/api/client'
 import { enrollmentApi, gradeComponentApi } from '@/api'
+import { downloadCsv } from '@/api/client'
 import type { CourseComponents, CreditSummary, MyCourse } from '@/api/types'
 import { creditText, gpaText, scoreText } from '@/utils/format'
+import { toast } from '@/components/useToast'
+import Btn from '@/components/Btn.vue'
 import Plate from '@/components/Plate.vue'
 import DataTable from '@/components/DataTable.vue'
 import type { Column } from '@/components/DataTable.vue'
@@ -80,6 +83,14 @@ function componentsOf(c: { courseCode: string; termName?: string | null }) {
 
 <template>
   <Plate title="成绩与学分" note="成绩由任课教师录入，学分与绩点由服务端按分段表计算">
+    <template #actions>
+      <Btn
+        variant="quiet"
+        @click="() => downloadCsv('/export/my-grades').then(() => toast('成绩已导出', 'ok')).catch((e) => toast(e.message ?? '导出失败', 'bad'))"
+      >
+        导出成绩
+      </Btn>
+    </template>
     <StateHost
       :state="state"
       :error-detail="errorDetail"

@@ -10,6 +10,7 @@
 import { onMounted, ref } from 'vue'
 import { ApiError } from '@/api/client'
 import { feeApi } from '@/api'
+import { downloadCsv } from '@/api/client'
 import type { FeeBill, FeeRule } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 import { useCurrentTerm } from '@/components/useTerm'
@@ -86,6 +87,15 @@ async function editRule(rule: FeeRule) {
       ? `${bill?.termName ?? currentTerm?.name ?? ''}：重新修读与刷分重新修读按学分收费`
       : '收费单价由教务处维护；学生端只能看自己的账单'"
   >
+    <template #actions>
+      <Btn
+        v-if="auth.isStudent"
+        variant="quiet"
+        @click="() => downloadCsv('/export/my-fee').then(() => toast('账单已导出', 'ok')).catch((e) => toast(e.message ?? '导出失败', 'bad'))"
+      >
+        导出账单
+      </Btn>
+    </template>
     <StateHost
       :state="state"
       :error-detail="errorDetail"

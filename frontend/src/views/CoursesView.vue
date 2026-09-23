@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { ApiError } from '@/api/client'
+import { ApiError, downloadCsv } from '@/api/client'
 import { courseApi } from '@/api'
 import type { Course } from '@/api/types'
 import { creditText } from '@/utils/format'
@@ -76,6 +76,12 @@ async function save() {
 <template>
   <Plate title="课程库" :note="`共 ${total} 门课程`">
     <template #actions>
+      <Btn
+        variant="quiet"
+        @click="() => downloadCsv('/export/courses', { keyword: filters.keyword }).then(() => toast('已导出课程库', 'ok')).catch((e) => toast(e.message ?? '导出失败', 'bad'))"
+      >
+        导出
+      </Btn>
       <Btn
         variant="solid"
         @click="

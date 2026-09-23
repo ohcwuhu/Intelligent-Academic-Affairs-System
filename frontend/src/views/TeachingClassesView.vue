@@ -4,7 +4,7 @@
  * 保存后服务端返回排课冲突（教师撞课、教室被占用），这里原样呈现，不阻断保存。
  */
 import { onMounted, ref } from 'vue'
-import { ApiError } from '@/api/client'
+import { ApiError, downloadCsv } from '@/api/client'
 import { basicApi, courseApi, teachingClassApi, teacherApi } from '@/api'
 import type { Course, ScheduleConflict, Teacher, TeachingClassVO, Term } from '@/api/types'
 import { creditText } from '@/utils/format'
@@ -130,6 +130,12 @@ async function remove(tc: TeachingClassVO) {
 <template>
   <Plate title="教学班开课" :note="`共 ${rows.length} 个教学班`">
     <template #actions>
+      <Btn
+        variant="quiet"
+        @click="() => downloadCsv('/export/teaching-classes', { termId: termFilter ? Number(termFilter) : undefined }).then(() => toast('已导出开课表', 'ok')).catch((e) => toast(e.message ?? '导出失败', 'bad'))"
+      >
+        导出
+      </Btn>
       <Btn variant="solid" @click="startCreate">新增开课</Btn>
     </template>
 
