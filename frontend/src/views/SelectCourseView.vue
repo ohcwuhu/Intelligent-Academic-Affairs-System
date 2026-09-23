@@ -9,6 +9,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { ApiError } from '@/api/client'
 import { enrollmentApi, teachingClassApi } from '@/api'
+import type { PlanHint } from '@/api/types'
 import type { ConflictItem, MyCourse, TeachingClassVO } from '@/api/types'
 import { creditText } from '@/utils/format'
 import { useCurrentTerm } from '@/components/useTerm'
@@ -24,6 +25,7 @@ const { currentTerm, load: loadTerm } = useCurrentTerm()
 const list = ref<TeachingClassVO[]>([])
 const mine = ref<MyCourse[]>([])
 const conflicts = ref<Map<number, ConflictItem[]>>(new Map())
+const hints = ref<Map<number, PlanHint>>(new Map())
 const state = ref<'loading' | 'ready' | 'empty' | 'error'>('loading')
 const errorDetail = ref('')
 const keyword = ref('')
@@ -46,6 +48,9 @@ async function load() {
       classes.map((c) => enrollmentApi.preview(c.id).catch(() => [] as ConflictItem[])),
     )
     conflicts.value = new Map(classes.map((c, i) => [c.id, previews[i]]))
+    // 培养计划提示：这门课算不算毕业学分、以前修过没有
+    const planHints = await enrollmentApi.planHints(termId).catch(() => [] as PlanHint[])
+    hints.value = new Map(planHints.map((h) => [h.courseId, h]))
     state.value = classes.length ? 'ready' : 'empty'
   } catch (e) {
     state.value = 'error'
@@ -69,6 +74,26 @@ const pickedCredit = computed(() => mine.value.reduce((s, c) => s + (c.credit ??
 function conflictOf(id: number): ConflictItem | null {
   const items = conflicts.value.get(id)
   return items && items.length ? items[0] : null
+}
+
+/** 计划提示文案：先说算不算毕业学分，再说修过没有。 */
+function planText(courseId: number): string {
+  const h = hints.value.get(courseId)
+  if (!h) return ''
+  const parts: string[] = []
+  if (h.inPlan) {
+    parts.push(`计划内 · ${h.module ?? '未分模块'}${h.planTerm ? ` · 第${h.planTerm}学期` : ''}`)
+  } else {
+    // 不写"不算毕业学分"：对不上可能只是方案里的课程名与课程库不同名，
+    // 断言成"不算数"会误导学生，如实说清依据不足即可
+    parts.push('未在培养方案中找到同名课程，学分归属请咨询教务处')
+  }
+  if (h.failedScore != null) {
+    parts.push(`以前 ${h.failedScore} 分未通过，本次属重新修读`)
+  } else if (h.passedScore != null) {
+    parts.push(`以前 ${h.passedScore} 分已通过，本次属刷分重新修读`)
+  }
+  return parts.join('　')
 }
 
 async function choose(c: TeachingClassVO) {
@@ -135,6 +160,9 @@ async function drop(c: MyCourse) {
             <p class="row__name">{{ c.courseName }}</p>
             <p class="row__meta">
               {{ c.courseType }} · {{ creditText(c.credit) }} 学分 · {{ c.teacherName ?? '教师待定' }}
+            </p>
+            <p v-if="planText(c.courseId)" class="row__plan" :class="{ 'is-out': !hints.get(c.courseId)?.inPlan }">
+              {{ planText(c.courseId) }}
             </p>
           </div>
           <div class="row__when">
@@ -246,6 +274,16 @@ async function drop(c: MyCourse) {
 .row__meta,
 .row__room {
   font-size: var(--t-xs);
+  color: var(--ink-muted);
+}
+
+/* 计划提示：这是选课时的决策信息，用青铜色小字，不要抢课程名 */
+.row__plan {
+  margin-top: 2px;
+  font-size: var(--t-xs);
+  color: var(--accent-deep);
+}
+.row__plan.is-out {
   color: var(--ink-muted);
 }
 

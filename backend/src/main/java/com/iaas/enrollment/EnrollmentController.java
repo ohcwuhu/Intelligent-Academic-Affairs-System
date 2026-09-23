@@ -29,6 +29,19 @@ public class EnrollmentController {
 
     private final EnrollmentService enrollmentService;
     private final StudentMapper studentMapper;
+    private final com.iaas.program.PlanHintService planHintService;
+
+    /**
+     * 选课提示：这门课在不在我的培养计划里、属于哪个模块、我以前修过没有。
+     * 身份取自令牌，学生只能看自己的。
+     */
+    @GetMapping("/plan-hints")
+    public R<List<com.iaas.program.PlanHintService.Hint>> planHints(
+            @RequestParam(required = false) Long termId) {
+        Long studentId = UserContext.require().requireStudentId();
+        Long term = termId != null ? termId : enrollmentService.currentTermId();
+        return R.ok(planHintService.hints(studentId, term));
+    }
 
     @GetMapping("/my")
     public R<List<EnrollmentDtos.MyCourse>> my(@RequestParam(required = false) Long termId,

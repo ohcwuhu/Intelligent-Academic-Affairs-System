@@ -492,12 +492,17 @@ public class ProgramImporter {
         Long collegeId = resolveCollegeId(majorName);
         // 同一次导入里同名课程只建一门（三门专业的方案里有大量公共课）
         Map<String, Course> createdInThisRun = new LinkedHashMap<>();
+        // 一门课程库课程只能被一条计划课程认领：
+        // 否则"算法与数据结构"和"算法与数据结构综合实训"会同时指向课程库里的"数据结构"，
+        // 毕业审核和选课提示就会把实践环节当成理论课
+        java.util.Set<Long> claimed = new java.util.HashSet<>();
         for (ProgramCourse pc : all) {
-            Course hit = matchCourse(pc.getCourseName(), existing);
+            Course hit = matchCourse(pc.getCourseName(), existing, claimed);
             if (hit == null) {
                 hit = createdInThisRun.get(ProgramService.normalize(pc.getCourseName()));
             }
             if (hit != null) {
+                claimed.add(hit.getId());
                 reused++;
                 if (commit) {
                     pc.setCourseId(hit.getId());
@@ -539,15 +544,18 @@ public class ProgramImporter {
     }
 
     /** 课程库里的匹配：精确优先，其次唯一包含。 */
-    private Course matchCourse(String planName, List<Course> existing) {
+    private Course matchCourse(String planName, List<Course> existing, java.util.Set<Long> claimed) {
         String key = ProgramService.normalize(planName);
         for (Course c : existing) {
-            if (ProgramService.normalize(c.getName()).equals(key)) {
+            if (!claimed.contains(c.getId()) && ProgramService.normalize(c.getName()).equals(key)) {
                 return c;
             }
         }
         List<Course> candidates = existing.stream()
                 .filter(c -> {
+                    if (claimed.contains(c.getId())) {
+                        return false;
+                    }
                     String n = ProgramService.normalize(c.getName());
                     return n.length() >= 4 && (n.contains(key) || key.contains(n));
                 })

@@ -32,6 +32,7 @@ import type {
   MessageRow,
   MyTextbooks,
   NoticeRow,
+  PlanHint,
   StudentComponents,
   GovernanceOverview,
   KnowledgeChunkDetail,
@@ -66,6 +67,8 @@ export const enrollmentApi = {
   conflicts: (termId?: number) => get<ConflictItem[]>('/enrollment/conflicts', { termId }),
   preview: (teachingClassId: number) =>
     get<ConflictItem[]>(`/enrollment/preview/${teachingClassId}`),
+  /** 选课提示：是否在培养计划内、既往修读情况 */
+  planHints: (termId?: number) => get<PlanHint[]>('/enrollment/plan-hints', { termId }),
   select: (teachingClassId: number) =>
     post<SelectResult>(`/enrollment/select/${teachingClassId}`),
   drop: (enrollmentId: number) => del<void>(`/enrollment/${enrollmentId}`),

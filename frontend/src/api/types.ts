@@ -269,6 +269,17 @@ export interface AssistantAnswer {
   durationMs: number
 }
 
+export interface PlanHint {
+  courseId: number
+  inPlan: boolean
+  module: string | null
+  planTerm: number | null
+  required: string | null
+  passedScore: number | null
+  failedScore: number | null
+  inCurrentTerm: boolean
+}
+
 export interface NoticeRow {
   id: number
   title: string
