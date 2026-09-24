@@ -210,7 +210,7 @@ const pendingCount = computed(() => messages.value.filter((m) => !m.reply).lengt
 }
 .notice.is-pinned {
   background: var(--face);
-  box-shadow: inset 3px 0 0 var(--accent);
+  border-left: 1px solid var(--accent);
 }
 .notice__head {
   display: flex;
@@ -259,7 +259,7 @@ const pendingCount = computed(() => messages.value.filter((m) => !m.reply).lengt
   padding: var(--s-2) var(--s-3);
   background: var(--face);
   font-size: var(--t-sm);
-  border-left: 3px solid var(--accent);
+  border-left: 1px solid var(--accent-deep);
 }
 .message__act {
   margin-top: var(--s-2);

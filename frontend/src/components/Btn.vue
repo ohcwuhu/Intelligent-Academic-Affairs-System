@@ -34,7 +34,7 @@ withDefaults(
   align-items: center;
   gap: var(--s-2);
   padding: 0 var(--s-3);
-  height: 30px;
+  height: var(--control-h);
   border-radius: var(--radius);
   border: 1px solid transparent;
   background: transparent;

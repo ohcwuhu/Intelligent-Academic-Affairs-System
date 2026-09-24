@@ -188,7 +188,7 @@ function componentsOf(c: { courseCode: string; termName?: string | null }) {
 
 .ledger__why {
   margin-top: var(--s-1);
-  font-size: 11px;
+  font-size: var(--t-2xs);
   color: var(--ink-muted);
 }
 

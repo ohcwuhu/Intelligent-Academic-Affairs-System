@@ -178,7 +178,8 @@ const shownCourses = computed(() =>
 }
 .picker__item.is-here {
   border-color: var(--structure);
-  box-shadow: inset 3px 0 0 var(--accent);
+  border-left: 1px solid var(--accent);
+  font-weight: 600;
 }
 .picker__name {
   font-size: var(--t-sm);

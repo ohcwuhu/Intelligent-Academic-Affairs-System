@@ -368,7 +368,11 @@ async function sendFeedback(t: Turn, type: 'USEFUL' | 'USELESS' | 'WRONG') {
   background: var(--ground);
 }
 .conv__item.is-here {
-  box-shadow: inset 3px 0 0 var(--accent);
+  /* 与左侧索引列同一套"当前项"表达：1px 线 + 底色 + 加粗。
+     不用粗色条——它是全站唯一被检测器点名的造型，也和"1px 线分层"的规则相冲。 */
+  border-left: 1px solid var(--accent);
+  background: var(--ground);
+  font-weight: 600;
 }
 .conv__title {
   overflow: hidden;
@@ -399,7 +403,7 @@ async function sendFeedback(t: Turn, type: 'USEFUL' | 'USELESS' | 'WRONG') {
 }
 .ask__input {
   flex: 1;
-  height: 34px;
+  height: var(--control-h);
   padding: 0 var(--s-3);
   background: var(--face);
   border: 1px solid var(--line-strong);
@@ -449,7 +453,7 @@ async function sendFeedback(t: Turn, type: 'USEFUL' | 'USELESS' | 'WRONG') {
   border-right: 0;
 }
 .ask__stats dt {
-  font-size: 11px;
+  font-size: var(--t-2xs);
   color: var(--ink-muted);
 }
 .ask__stats dd {
@@ -557,7 +561,7 @@ async function sendFeedback(t: Turn, type: 'USEFUL' | 'USELESS' | 'WRONG') {
   overflow: hidden;
 }
 .cite__meta {
-  font-size: 11px;
+  font-size: var(--t-2xs);
   color: var(--ink-muted);
 }
 .notes {

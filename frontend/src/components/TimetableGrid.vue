@@ -136,7 +136,7 @@ const grid = computed(() => DAYS.map((d) => ({ day: d, items: layoutDay(d) })))
 }
 
 .grid__axis-cell {
-  font-size: 10px;
+  font-size: var(--t-2xs);
   color: var(--ink-muted);
   text-align: right;
   padding-right: var(--s-2);
@@ -169,7 +169,8 @@ const grid = computed(() => DAYS.map((d) => ({ day: d, items: layoutDay(d) })))
 .block__code {
   align-self: flex-start;
   font-family: var(--font-mono);
-  font-size: 10px;
+  /* 课程代码是内容不是刻度：11px 的铭牌在办公室屏幕上不好认 */
+  font-size: var(--t-xs);
   color: var(--face);
   background: var(--structure);
   padding: 1px 4px;
@@ -183,7 +184,7 @@ const grid = computed(() => DAYS.map((d) => ({ day: d, items: layoutDay(d) })))
 }
 
 .block__meta {
-  font-size: 10px;
+  font-size: var(--t-xs);
   color: var(--ink-muted);
   line-height: 1.3;
 }

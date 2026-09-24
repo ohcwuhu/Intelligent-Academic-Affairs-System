@@ -109,7 +109,7 @@ defineEmits<{ retry: [] }>()
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   padding: 0 var(--s-3);
-  height: 30px;
+  height: var(--control-h);
   font-size: var(--t-sm);
   cursor: pointer;
 }

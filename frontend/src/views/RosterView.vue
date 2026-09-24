@@ -374,7 +374,7 @@ const columns: Column[] = [
 
 .score-err {
   display: block;
-  font-size: 10px;
+  font-size: var(--t-2xs);
   color: var(--bad);
   text-align: right;
 }

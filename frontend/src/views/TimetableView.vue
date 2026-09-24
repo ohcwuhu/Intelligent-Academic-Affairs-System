@@ -178,7 +178,7 @@ const listColumns: Column[] = [
 }
 
 .ruler__cell {
-  font-size: 10px;
+  font-size: var(--t-2xs);
   text-align: center;
   padding: 1px 0;
   background: var(--ground);
@@ -254,88 +254,6 @@ const listColumns: Column[] = [
   padding-left: 1.2em;
   font-size: var(--t-xs);
   color: var(--ink-muted);
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: 44px repeat(7, minmax(0, 1fr));
-  padding: 0 var(--s-4);
-}
-
-.grid__corner {
-  border-bottom: 1px solid var(--line-strong);
-}
-
-.grid__head {
-  padding: var(--s-2);
-  font-size: var(--t-xs);
-  font-weight: 600;
-  color: var(--ink-muted);
-  text-align: center;
-  border-bottom: 1px solid var(--line-strong);
-}
-
-.grid__head.is-today {
-  color: var(--accent-deep);
-  box-shadow: inset 0 -2px 0 var(--accent);
-}
-
-.grid__axis {
-  display: grid;
-  grid-template-rows: repeat(12, var(--row-h));
-}
-
-.grid__axis-cell {
-  font-size: 10px;
-  color: var(--ink-muted);
-  text-align: right;
-  padding-right: var(--s-2);
-  border-right: 1px solid var(--line);
-}
-
-.grid__day {
-  position: relative;
-  border-right: 1px solid var(--line);
-}
-
-.grid__day:last-child {
-  border-right: 0;
-}
-
-.grid__row {
-  height: var(--row-h);
-  border-bottom: 1px solid var(--line);
-}
-
-.block {
-  position: absolute;
-  overflow: hidden;
-  background: var(--face);
-  border: 1px solid var(--line-strong);
-  padding: var(--s-1) var(--s-2);
-}
-
-/* 课程代码做成一块小铭牌，这是这个世界表达身份的方式 */
-.block__code {
-  align-self: flex-start;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--face);
-  background: var(--structure);
-  padding: 1px 4px;
-  letter-spacing: 0.02em;
-}
-
-.block__name {
-  font-size: var(--t-xs);
-  font-weight: 600;
-  line-height: 1.25;
-}
-
-.block__meta {
-  font-size: 10px;
-  color: var(--ink-muted);
-  line-height: 1.3;
 }
 
 .listing {

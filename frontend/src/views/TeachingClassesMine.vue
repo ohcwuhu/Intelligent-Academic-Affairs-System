@@ -102,7 +102,7 @@ const totals = computed(() => ({
 }
 
 .card__seq {
-  font-size: 10px;
+  font-size: var(--t-2xs);
   color: var(--ink-muted);
 }
 

@@ -214,7 +214,7 @@ async function drop(c: MyCourse) {
   align-items: center;
   gap: var(--s-2);
   font-size: var(--t-sm);
-  height: 30px;
+  height: var(--control-h);
 }
 
 .bar__stat {
@@ -262,7 +262,7 @@ async function drop(c: MyCourse) {
 }
 
 .row__seq {
-  font-size: 10px;
+  font-size: var(--t-2xs);
   color: var(--ink-muted);
 }
 
@@ -305,7 +305,7 @@ async function drop(c: MyCourse) {
 }
 
 .row__seat-label {
-  font-size: 10px;
+  font-size: var(--t-2xs);
   color: var(--ink-muted);
 }
 
@@ -315,7 +315,7 @@ async function drop(c: MyCourse) {
   align-items: center;
   justify-content: flex-end;
   gap: var(--s-2);
-  min-height: 30px;
+  min-height: var(--control-h);
   /* 胶带是绝对定位铺满这个盒子的，盒子必须有确定宽度，
      否则 auto 宽会被算成 0，胶带就会溢出到行外。 */
   min-width: 152px;

@@ -99,6 +99,9 @@ function goHome() {
       </nav>
 
       <main class="main">
+        <!-- 文档级标题：全站每个页面原来只有 h2（来自 Plate 标题），
+             读屏用户拿不到"这是哪一页"；这里补一个视觉上不出现的 h1。 -->
+        <h1 class="sr">{{ pageTitle }}</h1>
         <RouterView />
       </main>
     </div>
@@ -144,7 +147,7 @@ function goHome() {
 }
 
 .bar__mark-sub {
-  font-size: 11px;
+  font-size: var(--t-2xs);
   font-weight: 400;
   color: var(--muted);
 }
@@ -200,7 +203,7 @@ function goHome() {
 
 .bar__role {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--t-2xs);
   color: var(--muted);
 }
 
@@ -234,7 +237,7 @@ function goHome() {
 }
 
 .rail__group-title {
-  font-size: 11px;
+  font-size: var(--t-2xs);
   color: var(--muted);
   padding: 0 var(--s-4) var(--s-2);
   letter-spacing: 0.08em;
@@ -263,7 +266,7 @@ function goHome() {
 .rail__foot {
   margin-top: auto;
   padding: var(--s-4);
-  font-size: 11px;
+  font-size: var(--t-2xs);
   color: var(--muted);
   border-top: 1px solid var(--structure-line);
 }

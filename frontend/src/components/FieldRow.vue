@@ -43,7 +43,7 @@ defineProps<{ label: string; hint?: string; error?: string; forId?: string }>()
 :deep(select),
 :deep(textarea) {
   width: 100%;
-  height: 30px;
+  height: var(--control-h);
   padding: 0 var(--s-2);
   background: var(--face-raised);
   border: 1px solid var(--line-strong);

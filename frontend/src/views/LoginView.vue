@@ -189,7 +189,7 @@ async function submit() {
   border-color: var(--accent);
   color: var(--face);
   font-weight: 600;
-  height: 34px;
+  height: var(--control-h);
 }
 
 .plate__form :deep(.btn--solid:hover:not(:disabled)) {
