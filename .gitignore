@@ -12,6 +12,7 @@ frontend/node_modules/
 # 可重新生成的验收产物
 .impeccable/review/
 .impeccable/ui-audit/
+.impeccable/*.log
 .impeccable/config.local.json
 
 # 外部自动化留下的中间产物

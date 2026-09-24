@@ -2,8 +2,11 @@ package com.iaas.knowledge;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -40,6 +43,7 @@ public class KnowledgeIngestService {
 
     private final KnowledgeDocumentMapper documentMapper;
     private final KnowledgeChunkMapper chunkMapper;
+    private final JdbcTemplate jdbcTemplate;
 
     /** 最近一次灌入的文档 ID，供启动流程接着走发布。 */
     private volatile Long lastDocumentId;
@@ -66,9 +70,53 @@ public class KnowledgeIngestService {
         }
         String title = stripExtension(path.getFileName().toString());
         try {
-            return ingest(title, Files.readString(path, StandardCharsets.UTF_8), sourcePath);
+            int n = ingest(title, Files.readString(path, StandardCharsets.UTF_8), sourcePath);
+            optimizeFulltextIndex();
+            return n;
         } catch (IOException e) {
             throw new IllegalStateException("读取语料失败：" + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 重建全文索引，把删除标记真正回收。
+     *
+     * <p>InnoDB 的全文索引在删行时不会立刻抹掉分词，只是把词条标成已删除。
+     * 灌入的做法是「先删旧文档、再插新切片」，于是每重建一次就往索引里堆一份
+     * 幽灵语料：行数看着还是 179，索引里的词量却在翻倍。语料总量被撑大，
+     * IDF 被压低，所有查询的相关度分数一起下滑。
+     *
+     * <p>实测（连续重建 8 次后）：「重修需要什么条件」的最高相关度从 5.08 掉到 1.57，
+     * 跌破 {@link RetrievalService} 的证据阈值 2.0，问答开始成片拒答；
+     * 同一份语料、同一个问题，跑一次 OPTIMIZE 就回到 5.08。所以这不是语料问题，
+     * 是索引没整理，重建索引的最后一步必须是它。
+     *
+     * <p>OPTIMIZE 对 InnoDB 是「重建表 + 更新统计」，属于 DDL，会隐式提交。
+     * 灌入本身是在一个事务里跑的（删旧文档 + 插新切片要么都成、要么都不成），
+     * 所以这里不能在事务中间直接跑：那会把它前面的删除与插入提前落盘，
+     * 灌入失败就没有回滚可言了。做法是挂到事务提交之后，
+     * 没有事务时（例如单元测试直连）就当场执行。失败只记警告不抛给调用方：
+     * 索引略脏只是相关度偏低，总好过让一次重建把知识库卡在半个状态上。
+     */
+    void optimizeFulltextIndex() {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    runOptimize();
+                }
+            });
+            return;
+        }
+        runOptimize();
+    }
+
+    private void runOptimize() {
+        try {
+            jdbcTemplate.execute("OPTIMIZE TABLE knowledge_chunk");
+        } catch (Exception e) {
+            log.warn("全文索引整理失败：{}。检索相关度可能偏低，建议人工执行 "
+                    + "OPTIMIZE TABLE knowledge_chunk", e.getMessage());
         }
     }
 

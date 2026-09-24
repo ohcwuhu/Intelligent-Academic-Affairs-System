@@ -612,6 +612,26 @@ await check('文档失效后不再被检索，重建索引后恢复', async () =
     `重建后仍然答不出来：mode=${afterRebuild.mode} 引用${afterRebuild.citations.length}条`,
   )
 
+  // 重建必须能反复做。InnoDB 的全文索引在删行时只打删除标记、不立刻清词条，
+  // 所以「删旧文档 + 插新切片」这套重建每跑一次就往索引里堆一份幽灵语料，
+  // 语料总量被撑大、IDF 被压低，所有问题的相关度分数一起下滑。
+  // 曾实测连续重建 8 次后同一问题的最高分从 5.08 掉到 1.57，跌破 2.0 的证据阈值，
+  // 问答开始成片拒答——只重建一次是发现不了的，这里再重建一次盯住它。
+  const again2 = await call(async () => {
+    const token = localStorage.getItem('iaas.token')
+    const res = await fetch('/api/knowledge/reingest', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return res.json()
+  })
+  assert(again2.code === 0, `第二次重建失败：${JSON.stringify(again2).slice(0, 120)}`)
+  const afterSecond = await askOnce()
+  assert(
+    afterSecond.mode !== 'refusal' && afterSecond.citations.length > 0,
+    `重复重建后答不出来（全文索引没整理）：mode=${afterSecond.mode} 引用${afterSecond.citations.length}条`,
+  )
+
   const audit = await call(async () => {
     const token = localStorage.getItem('iaas.token')
     const res = await fetch('/api/governance/audit?page=1&size=50', {
