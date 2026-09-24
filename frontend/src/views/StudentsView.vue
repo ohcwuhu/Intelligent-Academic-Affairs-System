@@ -6,6 +6,7 @@ import { basicApi, studentApi } from '@/api'
 import type { Clazz, StudentVO } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/components/useToast'
+import { confirmDialog } from '@/components/useDialog'
 import Plate from '@/components/Plate.vue'
 import Btn from '@/components/Btn.vue'
 import FieldRow from '@/components/FieldRow.vue'
@@ -97,7 +98,13 @@ async function save() {
 }
 
 async function remove(s: StudentVO) {
-  if (!confirm(`确认删除 ${s.name}（${s.studentNo}）的档案？`)) return
+  const ok = await confirmDialog({
+    title: `删除 ${s.name}（${s.studentNo}）的档案？`,
+    body: '有选课记录的学生不允许删除；如需终止学籍，应把学籍状态改为「退学」而不是删档案。',
+    confirmText: '删除',
+    danger: true,
+  })
+  if (!ok) return
   try {
     await studentApi.remove(s.id)
     toast('已删除', 'ok')

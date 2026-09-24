@@ -15,6 +15,7 @@ import type { FeeBill, FeeRule } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 import { useCurrentTerm } from '@/components/useTerm'
 import { toast } from '@/components/useToast'
+import { promptDialog } from '@/components/useDialog'
 import Plate from '@/components/Plate.vue'
 import Btn from '@/components/Btn.vue'
 import DataTable from '@/components/DataTable.vue'
@@ -63,7 +64,14 @@ async function load() {
 onMounted(load)
 
 async function editRule(rule: FeeRule) {
-  const raw = prompt(`修改「${rule.item}」的每学分单价（元）`, String(rule.creditPrice))
+  const raw = await promptDialog({
+    title: `修改「${rule.item}」的单价`,
+    body: '单价直接决定学生看到的应缴金额；改完立即生效，学生端下次打开就是新价。',
+    label: '每学分单价（元）',
+    value: String(rule.creditPrice),
+    required: true,
+    requiredHint: '单价不能为空',
+  })
   if (raw === null) return
   const price = Number(raw)
   if (Number.isNaN(price) || price < 0) {

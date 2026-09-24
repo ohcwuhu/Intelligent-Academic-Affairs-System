@@ -7,6 +7,7 @@ import { useCurrentTerm } from './useTerm'
 import { teachingWeek } from '@/utils/format'
 import type { Role } from '@/api/types'
 import ToastHost from './ToastHost.vue'
+import DialogHost from './DialogHost.vue'
 import Btn from './Btn.vue'
 
 const auth = useAuthStore()
@@ -102,7 +103,8 @@ function goHome() {
       </main>
     </div>
 
-    <ToastHost />
+<ToastHost />
+  <DialogHost />
   </div>
 </template>
 

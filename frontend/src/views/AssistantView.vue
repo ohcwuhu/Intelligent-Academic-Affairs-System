@@ -18,6 +18,7 @@ import type {
   KnowledgeChunkDetail,
 } from '@/api/types'
 import Plate from '@/components/Plate.vue'
+import { promptDialog } from '@/components/useDialog'
 import Btn from '@/components/Btn.vue'
 import StatusPlate from '@/components/StatusPlate.vue'
 
@@ -191,8 +192,17 @@ async function openCitation(c: Citation) {
 async function sendFeedback(t: Turn, type: 'USEFUL' | 'USELESS' | 'WRONG') {
   let detail = ''
   if (type === 'WRONG') {
-    detail = prompt('请说明答案错在哪里，便于教务处核对') ?? ''
-    if (!detail.trim()) return
+    const input = await promptDialog({
+      title: '这条回答哪里不对',
+      body: '写清错在哪里，教务处会核对条款并修订；能指出条号更好。',
+      label: '问题说明',
+      multiline: true,
+      required: true,
+      requiredHint: '请说明错在哪里，否则教务处无法核对',
+      confirmText: '提交反馈',
+    })
+    if (input === null) return
+    detail = input
   }
   try {
     await feedbackApi.submit({

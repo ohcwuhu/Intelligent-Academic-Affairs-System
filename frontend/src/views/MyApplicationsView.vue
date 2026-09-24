@@ -12,6 +12,7 @@ import { ApiError } from '@/api/client'
 import { applicationApi, classroomApi } from '@/api'
 import type { ApplicationOption, ApplicationRow, Certificate, ClassroomSlot } from '@/api/types'
 import { toast } from '@/components/useToast'
+import { confirmDialog } from '@/components/useDialog'
 import Plate from '@/components/Plate.vue'
 import Btn from '@/components/Btn.vue'
 import FieldRow from '@/components/FieldRow.vue'
@@ -171,7 +172,12 @@ async function submit() {
 }
 
 async function withdraw(row: ApplicationRow) {
-  if (!confirm(`撤回「${row.typeText}」这张申请？`)) return
+  const ok = await confirmDialog({
+    title: `撤回「${row.typeText}」？`,
+    body: `申请对象：${row.target}\n撤回后这张单子不再出现在教务处的待办里，需要时可以重新提交。`,
+    confirmText: '撤回',
+  })
+  if (!ok) return
   try {
     await applicationApi.withdraw(row.id)
     toast('已撤回', 'ok')

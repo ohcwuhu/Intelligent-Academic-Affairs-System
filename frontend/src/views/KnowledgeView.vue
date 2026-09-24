@@ -11,6 +11,7 @@ import { ApiError } from '@/api/client'
 import { knowledgeApi } from '@/api'
 import type { KnowledgeDocumentRow } from '@/api/types'
 import { toast } from '@/components/useToast'
+import { confirmDialog, promptDialog } from '@/components/useDialog'
 import Plate from '@/components/Plate.vue'
 import Btn from '@/components/Btn.vue'
 import DataTable from '@/components/DataTable.vue'
@@ -84,11 +85,18 @@ async function publish(doc: KnowledgeDocumentRow) {
   let force = false
   let reason = ''
   if (issues.length) {
-    reason = prompt(
-      `发布门禁未通过：\n${issues.map((i) => '· ' + i).join('\n')}\n\n` +
-        `要强行发布，请填写理由（会记入审计）；留空则取消。`,
-    ) ?? ''
-    if (!reason.trim()) return
+    const input = await promptDialog({
+      title: '发布门禁未通过，要强行发布吗',
+      body: `未通过项：\n${issues.map((i) => '· ' + i).join('\n')}\n\n强行发布的理由会记入审计。`,
+      label: '强行发布的理由',
+      multiline: true,
+      required: true,
+      requiredHint: '强行发布必须写理由，否则请先补齐材料',
+      confirmText: '强行发布',
+      danger: true,
+    })
+    if (input === null) return
+    reason = input
     force = true
   }
   try {
@@ -101,8 +109,17 @@ async function publish(doc: KnowledgeDocumentRow) {
 }
 
 async function expire(doc: KnowledgeDocumentRow) {
-  const reason = prompt('填写失效理由（会记入审计）') ?? ''
-  if (!reason.trim()) return
+  const reason = await promptDialog({
+    title: `把「${doc.title}」标记为失效？`,
+    body: '失效后检索不再召回这份文档，学生问相关问题会答"知识库没有覆盖"。',
+    label: '失效理由',
+    multiline: true,
+    required: true,
+    requiredHint: '失效必须写理由',
+    confirmText: '标记失效',
+    danger: true,
+  })
+  if (reason === null) return
   try {
     await knowledgeApi.expire(doc.id, reason)
     toast('已标记失效，检索不再召回', 'ok')
@@ -113,7 +130,13 @@ async function expire(doc: KnowledgeDocumentRow) {
 }
 
 async function reingest() {
-  if (!confirm('重建索引会重新解析语料并覆盖现有切片，确认继续？')) return
+  const ok = await confirmDialog({
+    title: '重建知识库索引？',
+    body: '会重新解析语料并覆盖现有切片。重建后按上一版状态重新生效，切片数应保持 179 片。',
+    confirmText: '重建',
+    danger: true,
+  })
+  if (!ok) return
   try {
     const n = await knowledgeApi.reingest()
     toast(`重建完成，共 ${n} 片切片`, 'ok')

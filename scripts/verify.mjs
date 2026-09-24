@@ -839,8 +839,8 @@ await check('学生反馈能在治理台被处理', async () => {
     assert(/已修正|已处理/.test(t), `反馈既没待处理也没处理痕迹：${t.replace(/\s+/g, ' ')}`)
     return '该反馈已处理，处理痕迹可查'
   }
-  page.once('dialog', (d) => d.accept('已核对条款引用并修正'))
   await btn.click()
+  await fillDialog(page, '已核对条款引用并修正')
   await page.waitForTimeout(1500)
   const toast = await page.locator('.toast').last().innerText()
   assert(/已标记修正/.test(toast), `处理反馈失败：${toast}`)
@@ -862,8 +862,8 @@ await check('知识缺口能在治理台标记补录', async () => {
     assert(/已补录|已处理/.test(body), `缺口既没有待处理项，也没有处理痕迹：${body.replace(/\s+/g, ' ').slice(0, 120)}`)
     return '缺口已全部处理，处理痕迹可查'
   }
-  page.once('dialog', (d) => d.accept('已补录到学生手册第二十三条'))
   await btn.click()
+  await fillDialog(page, '已补录到学生手册第二十三条')
   await page.waitForTimeout(1500)
   const toast = await page.locator('.toast').last().innerText()
   assert(/已记录补录结果/.test(toast), `处理缺口失败：${toast}`)
@@ -1061,8 +1061,8 @@ await check('通知能看，学生留言能被教务回复', async () => {
   await settleContent(page)
   const row = page.locator('.message', { hasText: question }).first()
   assert(await row.count(), '教务看不到学生留言')
-  page.once('dialog', (d) => d.accept('在「学分收费」页查看金额，缴费到行政楼一楼财务窗口'))
   await row.locator('button:has-text("回复")').click()
+  await fillDialog(page, '在「学分收费」页查看金额，缴费到行政楼一楼财务窗口')
   await page.waitForTimeout(1500)
 
   await logout(page)
@@ -1146,8 +1146,8 @@ await check('证明打印：审批通过后能出可打印的证明', async () =
   await settleContent(page)
   const row = page.locator('tbody tr', { hasText: '成绩证明' }).first()
   assert(await row.count(), '教务看不到这张证明申请')
-  page.once('dialog', (d) => d.accept('已核对，同意出具'))
   await row.locator('button:has-text("通过")').click()
+  await fillDialog(page, '已核对，同意出具')
   await page.waitForTimeout(1500)
 
   await logout(page)
@@ -1468,8 +1468,8 @@ await check('教务审批：待办排在最前，通过后学生能看到意见'
   assert(/待审/.test(firstText), `第一行不是待审的单子：${firstText.replace(/\s+/g, ' ')}`)
   await shot(page, '20-application-review')
 
-  page.once('dialog', (d) => d.accept('已核对成绩，同意重修'))
   await first.locator('button:has-text("通过")').click()
+  await fillDialog(page, '已核对成绩，同意重修')
   await page.waitForTimeout(1800)
   const toast = await page.locator('.toast').last().innerText()
   assert(/已通过/.test(toast), `审批没有成功：${toast}`)
@@ -1540,3 +1540,22 @@ console.log(`\n通过 ${report.passed}/${report.total}，截图 ${shots.length} 
 process.exit(failed.length ? 1 : 0)
 
 
+/**
+ * 应用内对话框：填内容后点确认。
+ *
+ * 这套界面已经不用浏览器原生 confirm/prompt（长相不属于这套系统、也无法校验），
+ * 所以验收脚本要操作的是页面里的对话框，而不是 CDP 的 dialog 事件。
+ */
+async function fillDialog(page, text, confirmText) {
+  const dialog = page.locator('.dialog')
+  await dialog.waitFor({ timeout: 5000 })
+  const input = page.locator('#dialog-input')
+  if (await input.count()) {
+    await input.fill(text)
+  }
+  const confirm = confirmText
+    ? dialog.locator(`button:has-text("${confirmText}")`)
+    : dialog.locator('button').last()
+  await confirm.click()
+  await page.waitForTimeout(400)
+}

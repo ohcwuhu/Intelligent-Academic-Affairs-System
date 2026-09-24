@@ -11,6 +11,7 @@ import { ApiError } from '@/api/client'
 import { feedbackApi, governanceApi } from '@/api'
 import type { AuditRow, FeedbackRow, GovernanceOverview, KnowledgeGapRow } from '@/api/types'
 import { toast } from '@/components/useToast'
+import { promptDialog } from '@/components/useDialog'
 import Plate from '@/components/Plate.vue'
 import Btn from '@/components/Btn.vue'
 import DataTable from '@/components/DataTable.vue'
@@ -80,8 +81,16 @@ async function load() {
 onMounted(load)
 
 async function handleFeedback(row: FeedbackRow) {
-  const note = prompt('处理说明（会记录处理人与时间）') ?? ''
-  if (!note.trim()) return
+  const note = await promptDialog({
+    title: '标记这条反馈已处理',
+    body: `学生反馈：${row.question}\n处理说明会记录处理人与时间，作为治理留痕。`,
+    label: '处理说明',
+    multiline: true,
+    required: true,
+    requiredHint: '请写一句处理说明',
+    confirmText: '标记已处理',
+  })
+  if (note === null) return
   try {
     await feedbackApi.handle(row.id, '已修正', note)
     toast('已标记修正，评测脚本会把它纳入回归用例', 'ok')
@@ -92,8 +101,16 @@ async function handleFeedback(row: FeedbackRow) {
 }
 
 async function handleGap(row: KnowledgeGapRow) {
-  const note = prompt('处理说明，例如已补录哪份文件的哪一条') ?? ''
-  if (!note.trim()) return
+  const note = await promptDialog({
+    title: '标记这个知识缺口已补录',
+    body: `学生反复问、系统答不上来的问题：${row.sampleQuestion}\n写清补录到哪份文件的哪一条，下次灌入才有据可查。`,
+    label: '处理说明',
+    multiline: true,
+    required: true,
+    requiredHint: '请写明补录到哪份文件的哪一条',
+    confirmText: '标记已补录',
+  })
+  if (note === null) return
   try {
     await governanceApi.handleGap(row.id, '已补录', '教务处', note)
     toast('已记录补录结果', 'ok')

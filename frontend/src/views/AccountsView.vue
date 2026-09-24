@@ -4,6 +4,7 @@ import { ApiError } from '@/api/client'
 import { userApi } from '@/api'
 import type { AppUser } from '@/api/types'
 import { toast } from '@/components/useToast'
+import { promptDialog } from '@/components/useDialog'
 import Plate from '@/components/Plate.vue'
 import Btn from '@/components/Btn.vue'
 import FieldRow from '@/components/FieldRow.vue'
@@ -78,8 +79,18 @@ async function create() {
 }
 
 async function resetPassword(u: AppUser) {
-  const pwd = prompt(`为 ${u.realName} 设置新口令（至少 6 位）`)
-  if (!pwd) return
+  const pwd = await promptDialog({
+    title: `为 ${u.realName} 重置口令`,
+    body: '口令由管理员设置并当面告知本人；系统不存明文，忘记后只能再重置。',
+    label: '新口令（至少 6 位）',
+    required: true,
+    requiredHint: '口令不能为空',
+  })
+  if (pwd === null) return
+  if (pwd.length < 6) {
+    toast('口令至少 6 位', 'bad')
+    return
+  }
   try {
     await userApi.resetPassword(u.id, pwd)
     toast('口令已重置', 'ok')

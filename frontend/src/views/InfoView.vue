@@ -11,6 +11,7 @@ import { infoApi } from '@/api'
 import type { MessageRow, NoticeRow } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/components/useToast'
+import { promptDialog } from '@/components/useDialog'
 import Plate from '@/components/Plate.vue'
 import Btn from '@/components/Btn.vue'
 import FieldRow from '@/components/FieldRow.vue'
@@ -72,8 +73,17 @@ async function ask() {
 }
 
 async function reply(row: MessageRow) {
-  const text = prompt('回复内容（学生会在同一页看到）', row.reply ?? '')
-  if (text === null || !text.trim()) return
+  const text = await promptDialog({
+    title: `回复 ${row.studentName ?? '学生'} 的留言`,
+    body: row.content,
+    label: '回复内容（学生会在同一页看到）',
+    value: row.reply ?? '',
+    multiline: true,
+    required: true,
+    requiredHint: '回复不能为空',
+    confirmText: '回复',
+  })
+  if (text === null) return
   try {
     await infoApi.reply(row.id, text)
     toast('已回复', 'ok')

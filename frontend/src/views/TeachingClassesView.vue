@@ -9,6 +9,7 @@ import { basicApi, courseApi, teachingClassApi, teacherApi } from '@/api'
 import type { Course, ScheduleConflict, Teacher, TeachingClassVO, Term } from '@/api/types'
 import { creditText } from '@/utils/format'
 import { toast } from '@/components/useToast'
+import { confirmDialog } from '@/components/useDialog'
 import Plate from '@/components/Plate.vue'
 import Btn from '@/components/Btn.vue'
 import FieldRow from '@/components/FieldRow.vue'
@@ -116,7 +117,13 @@ async function save() {
 }
 
 async function remove(tc: TeachingClassVO) {
-  if (!confirm(`确认删除教学班 ${tc.code}？`)) return
+  const ok = await confirmDialog({
+    title: `删除教学班 ${tc.code}？`,
+    body: '已有学生选课的教学班不能删除；如本学期不再开课，应把状态改为「停开」。',
+    confirmText: '删除',
+    danger: true,
+  })
+  if (!ok) return
   try {
     await teachingClassApi.remove(tc.id)
     toast('已删除', 'ok')

@@ -11,6 +11,7 @@ import { ApiError } from '@/api/client'
 import { applicationApi } from '@/api'
 import type { ApplicationRow } from '@/api/types'
 import { toast } from '@/components/useToast'
+import { promptDialog } from '@/components/useDialog'
 import Plate from '@/components/Plate.vue'
 import Btn from '@/components/Btn.vue'
 import DataTable from '@/components/DataTable.vue'
@@ -54,13 +55,23 @@ async function load() {
 onMounted(load)
 
 async function review(row: ApplicationRow, action: 'APPROVE' | 'REJECT') {
-  const note = prompt(
-    action === 'APPROVE'
-      ? `通过「${row.studentName ?? ''}」的${row.typeText}，填写意见（可留空）`
-      : `驳回理由（必填，学生据此知道下一步怎么办）`,
-  )
-  if (action === 'REJECT' && !note?.trim()) return
-  if (action === 'APPROVE' && note === null) return
+  const note = await promptDialog({
+    title:
+      action === 'APPROVE'
+        ? `通过「${row.studentName ?? ''}」的${row.typeText}`
+        : `驳回「${row.studentName ?? ''}」的${row.typeText}`,
+    body:
+      action === 'APPROVE'
+        ? `申请对象：${row.target}\n系统预检：${row.precheckNote ?? '无'}`
+        : `申请对象：${row.target}\n驳回理由会直接展示给学生，请写清下一步该怎么办。`,
+    label: action === 'APPROVE' ? '审批意见（可留空）' : '驳回理由',
+    multiline: true,
+    required: action === 'REJECT',
+    requiredHint: '驳回必须写理由，学生据此才知道下一步怎么办',
+    confirmText: action === 'APPROVE' ? '通过' : '驳回',
+    danger: action === 'REJECT',
+  })
+  if (note === null) return
   try {
     await applicationApi.review(row.id, action, note ?? '')
     toast(action === 'APPROVE' ? '已通过' : '已驳回', action === 'APPROVE' ? 'ok' : 'info')

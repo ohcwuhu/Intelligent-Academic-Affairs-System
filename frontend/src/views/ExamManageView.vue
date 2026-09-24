@@ -11,6 +11,7 @@ import { ApiError } from '@/api/client'
 import { examApi, teachingClassApi } from '@/api'
 import type { ExamRow, TeachingClassVO } from '@/api/types'
 import { toast } from '@/components/useToast'
+import { confirmDialog } from '@/components/useDialog'
 import { useCurrentTerm } from '@/components/useTerm'
 import Plate from '@/components/Plate.vue'
 import Btn from '@/components/Btn.vue'
@@ -124,7 +125,13 @@ async function save() {
 }
 
 async function remove(row: ExamRow) {
-  if (!confirm(`删除「${row.courseName}」${row.examDate} 的考试安排？`)) return
+  const ok = await confirmDialog({
+    title: `删除「${row.courseName}」的考试安排？`,
+    body: `${row.examDate} ${row.startTime}-${row.endTime}　${row.classroom ?? '考场待定'}\n删除后学生端不再显示这场考试。`,
+    confirmText: '删除',
+    danger: true,
+  })
+  if (!ok) return
   try {
     await examApi.remove(row.id)
     toast('已删除', 'ok')
